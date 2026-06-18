@@ -1,21 +1,14 @@
-# Python
 __pycache__/
 *.pyc
-.venv/
-venv/
+*.pyo
+*.pyd
 .env
-
-# SQLite / local db
-*.db
-
-# Frontend
-node_modules/
+venv/
+.venv/
+env/
+*.egg-info/
 dist/
-
-# OS / IDE
+build/
 .DS_Store
-.idea/
-.vscode/
-
-# Logs
-*.log
+app.db
+*.sqlite3
