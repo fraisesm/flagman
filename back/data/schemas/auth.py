@@ -1,5 +1,9 @@
+import re
 from typing import Literal, Optional
 from pydantic import BaseModel, EmailStr, field_validator
+
+# Принимаем: +79891234567 / 79891234567 / 89891234567
+PHONE_REGEX = re.compile(r'^(\+7|7|8)\d{10}$')
 
 
 class RegisterRequest(BaseModel):
@@ -25,10 +29,23 @@ class RegisterRequest(BaseModel):
 
     @field_validator("phone")
     @classmethod
-    def phone_not_empty(cls, v: str) -> str:
-        if not v.strip():
+    def phone_valid(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
             raise ValueError("Телефон не может быть пустым")
-        return v.strip()
+        # Убираем пробелы и дефисы если есть (например +7 989 123-45-67)
+        cleaned = re.sub(r'[\s\-()]', '', v)
+        if not PHONE_REGEX.match(cleaned):
+            raise ValueError(
+                "Неверный формат номера телефона. "
+                "Используйте формат +79891234567, 79891234567 или 89891234567"
+            )
+        # Приводим к единому формату +7XXXXXXXXXX
+        if cleaned.startswith('8'):
+            cleaned = '+7' + cleaned[1:]
+        elif cleaned.startswith('7'):
+            cleaned = '+' + cleaned
+        return cleaned
 
 
 class RegisterResponse(BaseModel):
