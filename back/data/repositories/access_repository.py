@@ -6,6 +6,19 @@ class AccessRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    def assign_role(self, role):
+        """Create a new DepartmentRole from a domain object."""
+        role_model = DepartmentRoleModel(
+            user_id=role.user_id,
+            organization_id=role.organization_id,
+            department_id=role.department_id,
+            role_name=role.role_name,
+            can_send_document=role.can_send_document,
+            can_sign_document=role.can_sign_document,
+            can_manage_department=role.can_manage_department,
+        )
+        return self.create(role_model)
+
     def create(self, role_model: DepartmentRoleModel):
         self.db.add(role_model)
         self.db.commit()
