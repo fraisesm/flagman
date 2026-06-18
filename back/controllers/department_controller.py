@@ -57,7 +57,7 @@ def update_department(
     repo = DepartmentRepository(db)
     try:
         return UpdateDepartmentHandler(repo).handle(
-            UpdateDepartmentCommand(department_id=department_id, name=request.name, description=request.description)
+            UpdateDepartmentCommand(department_id=department_id, name=request.name, description=request.description) # type: ignore
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

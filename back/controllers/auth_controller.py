@@ -22,7 +22,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         email=request.email,
         phone=request.phone,
         password=request.password,
-        role=request.role,
+        role=request.role, # type: ignore
     )
     try:
         handler.handle(command)
