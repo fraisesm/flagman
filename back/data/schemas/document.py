@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 
 class CreateDocumentRequest(BaseModel):
@@ -15,6 +15,19 @@ class UpdateDocumentRequest(BaseModel):
 
 
 class SendDocumentRequest(BaseModel):
+    document_id: int
+    organization_id: int
+    department_id: Optional[int] = None
+    recipient_user_id: int
+
+
+class SendToDepartmentRequest(BaseModel):
+    document_id: int
+    organization_id: int
+    department_id: int
+
+
+class ForwardDocumentRequest(BaseModel):
     document_id: int
     organization_id: int
     department_id: Optional[int] = None

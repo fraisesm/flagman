@@ -25,6 +25,18 @@ class AccessRepository:
             .first()
         )
 
+    def get_user_role_in_department(self, user_id: int, organization_id: int, department_id: int):
+        """Get role of a user in a specific department of an organization."""
+        return (
+            self.db.query(DepartmentRoleModel)
+            .filter(
+                DepartmentRoleModel.user_id == user_id,
+                DepartmentRoleModel.organization_id == organization_id,
+                DepartmentRoleModel.department_id == department_id,
+            )
+            .first()
+        )
+
     def get_all_by_organization(self, organization_id: int):
         return (
             self.db.query(DepartmentRoleModel)

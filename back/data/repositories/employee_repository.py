@@ -35,6 +35,17 @@ class EmployeeRepository:
     def get_all_by_organization(self, organization_id: int):
         return self.db.query(EmployeeMembershipModel).filter(EmployeeMembershipModel.organization_id == organization_id).all()
 
+    def get_by_department(self, organization_id: int, department_id: int):
+        """Get all members of a specific department in an organization."""
+        return (
+            self.db.query(EmployeeMembershipModel)
+            .filter(
+                EmployeeMembershipModel.organization_id == organization_id,
+                EmployeeMembershipModel.department_id == department_id,
+            )
+            .all()
+        )
+
     def update_role(self, membership_id: int, role: str, department_id: int):
         model = self.get_by_id(membership_id)
         if model:
