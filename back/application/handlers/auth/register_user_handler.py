@@ -17,5 +17,6 @@ class RegisterUserHandler:
             email=command.email,
             phone=command.phone,
             password=hash_password(command.password),
+            role=command.role,
         )
         return self.user_repository.create(user)

@@ -22,6 +22,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         email=request.email,
         phone=request.phone,
         password=request.password,
+        role=request.role,
     )
     try:
         handler.handle(command)
@@ -36,8 +37,8 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     handler = LoginUserHandler(user_repository)
     command = LoginUserCommand(email=request.email, password=request.password)
     try:
-        token = handler.handle(command)
-        return LoginResponse(access_token=token)
+        result = handler.handle(command)
+        return LoginResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
 
@@ -62,3 +63,14 @@ def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.get("/users", response_model=list[UserMeResponse])
+def get_all_users(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Только для admin — список всех пользователей"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    return UserRepository(db).get_all()

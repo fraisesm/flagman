@@ -8,8 +8,16 @@ class LoginUserHandler:
     def __init__(self, user_repository: UserRepository):
         self.user_repository = user_repository
 
-    def handle(self, command: LoginUserCommand) -> str:
+    def handle(self, command: LoginUserCommand):
         user = self.user_repository.get_by_email(command.email)
         if not user or not verify_password(command.password, user.password):
             raise ValueError("Неверный email или пароль")
-        return create_access_token({"sub": str(user.id)})
+        token = create_access_token({"sub": str(user.id), "role": user.role})
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user_id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+        }

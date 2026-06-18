@@ -11,3 +11,4 @@ class UserModel(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     phone = Column(String, nullable=False)
     password = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="employee")  # admin | boss | employee
