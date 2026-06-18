@@ -51,7 +51,13 @@
               <input v-model="registerForm.phone" class="input" type="tel" placeholder="+7 900 000 00 00" />
             </label>
             <label class="field-label">Пароль
-              <input v-model="registerForm.password" class="input" type="password" placeholder="••••••••" />
+              <input v-model="registerForm.password" class="input" type="password" placeholder="•••••• (мин. 6 символов)" />
+            </label>
+            <label class="field-label">Роль
+              <select v-model="registerForm.role" class="input">
+                <option value="employee">Сотрудник</option>
+                <option value="boss">Начальник</option>
+              </select>
             </label>
             <details class="auth-backend">
               <summary>Настройки сервера</summary>
@@ -83,7 +89,7 @@
           <span class="header__brand">Флагман</span>
         </div>
 
-        <nav class="header__tabs" v-if="userRole" role="tablist">
+        <nav class="header__tabs" role="tablist">
           <button
             v-for="tab in visibleTabs"
             :key="tab.key"
@@ -99,13 +105,10 @@
         </nav>
 
         <div class="header__right">
-          <div class="role-pill" title="Роль в системе">
+          <!-- Роль — только для отображения, не редактируется -->
+          <div class="role-pill" :class="'role-pill--' + userRole" title="Ваша роль в системе">
             <span class="role-icon" aria-hidden="true">{{ roleIcon }}</span>
-            <select v-model="userRole" class="role-select" aria-label="Выбор роли">
-              <option value="admin">Администратор</option>
-              <option value="manager">Начальник</option>
-              <option value="employee">Сотрудник</option>
-            </select>
+            <span class="role-label">{{ roleLabel }}</span>
           </div>
           <span class="user-name">{{ currentUser?.full_name ?? currentUser?.email ?? 'Пользователь' }}</span>
           <button class="btn btn--ghost btn--sm" @click="logout">Выйти</button>
@@ -153,15 +156,15 @@
                 <span class="kpi-value kpi-value--ok">{{ outboxList.length }}</span>
                 <span class="kpi-sub">завершено</span>
               </div>
-              <div v-if="userRole === 'admin'" class="kpi-card">
+              <div v-if="isAdmin" class="kpi-card">
                 <span class="kpi-label">Система</span>
                 <span class="kpi-value kpi-value--ok" style="font-size:14px;font-weight:700">● Онлайн</span>
                 <span class="kpi-sub">{{ baseUrl }}</span>
               </div>
             </div>
 
-            <!-- ADMIN -->
-            <template v-if="userRole === 'admin'">
+            <!-- ADMIN HOME -->
+            <template v-if="isAdmin">
               <div class="section-block">
                 <h2 class="section-title">Управление структурой</h2>
                 <div class="cards-grid">
@@ -229,7 +232,6 @@
                   </div>
                 </div>
               </div>
-
               <div class="section-block">
                 <h2 class="section-title">Настройки сервера</h2>
                 <div class="card card--narrow">
@@ -246,8 +248,8 @@
               </div>
             </template>
 
-            <!-- MANAGER -->
-            <div v-if="userRole === 'manager'" class="section-block">
+            <!-- BOSS HOME -->
+            <div v-if="isBoss" class="section-block">
               <h2 class="section-title">Создать и отправить документ</h2>
               <div class="cards-grid">
                 <div class="card">
@@ -295,8 +297,8 @@
               </div>
             </div>
 
-            <!-- EMPLOYEE -->
-            <div v-if="userRole === 'employee'" class="section-block">
+            <!-- EMPLOYEE HOME -->
+            <div v-if="isEmployee" class="section-block">
               <div class="section-title-row">
                 <h2 class="section-title">Требуют вашей подписи</h2>
                 <button class="btn btn--ghost btn--sm" @click="loadPending">↻ Обновить</button>
@@ -323,58 +325,32 @@
           <!-- ======== ПОЛУЧЕННЫЕ ПИСЬМА ======== -->
           <section v-else-if="activeTab === 'inbox'" key="inbox">
             <div class="page-header">
-              <div>
-                <h1>Полученные письма</h1>
-                <p class="page-sub">Все входящие документы</p>
-              </div>
+              <div><h1>Полученные письма</h1><p class="page-sub">Все входящие документы</p></div>
               <button class="btn btn--ghost btn--sm" @click="loadInbox">↻ Обновить</button>
             </div>
-            <div class="filter-bar">
-              <label class="field-label">ID пользователя
-                <input v-model.number="inboxUserId" class="input input--sm" type="number" placeholder="ID" />
-              </label>
-              <button class="btn btn--primary btn--sm" @click="loadInbox">Загрузить</button>
-              <button class="btn btn--ghost btn--sm" @click="inboxUserId = lastIds.user_id">Мой ID</button>
-            </div>
             <div v-if="inboxList.length" class="doc-list">
-              <div
-                v-for="doc in inboxList"
-                :key="doc.document_id ?? doc.id"
-                class="doc-row"
-                :class="{ 'doc-row--new': doc.status === 'new' || !doc.status, 'doc-row--pending': doc.status === 'pending', 'doc-row--signed': doc.status === 'signed' }"
-              >
+              <div v-for="doc in inboxList" :key="doc.document_id ?? doc.id" class="doc-row"
+                :class="{ 'doc-row--new': doc.status === 'new' || !doc.status, 'doc-row--pending': doc.status === 'pending', 'doc-row--signed': doc.status === 'signed' }">
                 <div class="doc-row__info">
                   <span class="doc-title">{{ doc.title ?? 'Документ #' + (doc.document_id ?? doc.id) }}</span>
                   <span class="doc-id">ID: {{ doc.document_id ?? doc.id }}</span>
                 </div>
-                <span
-                  class="doc-status"
-                  :class="{ 'doc-status--new': doc.status === 'new' || !doc.status, 'doc-status--pending': doc.status === 'pending', 'doc-status--signed': doc.status === 'signed' }"
-                >{{ docStatusLabel(doc.status) }}</span>
+                <span class="doc-status" :class="{ 'doc-status--new': doc.status === 'new' || !doc.status, 'doc-status--pending': doc.status === 'pending', 'doc-status--signed': doc.status === 'signed' }">
+                  {{ docStatusLabel(doc.status) }}
+                </span>
               </div>
             </div>
             <div v-else class="empty-state">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.35"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
               <p>Нет входящих документов</p>
-              <button class="btn btn--ghost btn--sm" @click="loadInbox">Загрузить</button>
             </div>
           </section>
 
           <!-- ======== НЕ ПОДПИСАННЫЕ ======== -->
           <section v-else-if="activeTab === 'read_unsigned'" key="read_unsigned">
             <div class="page-header">
-              <div>
-                <h1>Не подписанные</h1>
-                <p class="page-sub">Документы, ожидающие вашей подписи</p>
-              </div>
+              <div><h1>Не подписанные</h1><p class="page-sub">Документы, ожидающие вашей подписи</p></div>
               <button class="btn btn--ghost btn--sm" @click="loadPending">↻ Обновить</button>
-            </div>
-            <div class="filter-bar">
-              <label class="field-label">ID пользователя
-                <input v-model.number="pendingUserId" class="input input--sm" type="number" placeholder="ID" />
-              </label>
-              <button class="btn btn--primary btn--sm" @click="loadPending">Загрузить</button>
-              <button class="btn btn--ghost btn--sm" @click="pendingUserId = lastIds.user_id">Мой ID</button>
             </div>
             <div v-if="pendingList.length" class="doc-list">
               <div v-for="doc in pendingList" :key="doc.document_id" class="doc-row doc-row--pending">
@@ -397,18 +373,8 @@
           <!-- ======== ПОДПИСАННЫЕ ======== -->
           <section v-else-if="activeTab === 'signed'" key="signed">
             <div class="page-header">
-              <div>
-                <h1>Подписанные документы</h1>
-                <p class="page-sub">Документы с завершённым статусом</p>
-              </div>
+              <div><h1>Подписанные документы</h1><p class="page-sub">Документы с завершённым статусом</p></div>
               <button class="btn btn--ghost btn--sm" @click="loadOutbox">↻ Обновить</button>
-            </div>
-            <div class="filter-bar">
-              <label class="field-label">ID пользователя
-                <input v-model.number="outboxUserId" class="input input--sm" type="number" placeholder="ID" />
-              </label>
-              <button class="btn btn--primary btn--sm" @click="loadOutbox">Загрузить</button>
-              <button class="btn btn--ghost btn--sm" @click="outboxUserId = lastIds.user_id">Мой ID</button>
             </div>
             <div v-if="outboxList.length" class="doc-list">
               <div v-for="doc in outboxList" :key="doc.document_id ?? doc.id" class="doc-row doc-row--signed">
@@ -425,13 +391,10 @@
             </div>
           </section>
 
-          <!-- ======== НАЧАЛЬНИК: ОТПРАВИТЬ ======== -->
-          <section v-else-if="activeTab === 'send'" key="send">
+          <!-- ======== НАЧАЛЬНИК: ОТПРАВИТЬ (только boss) ======== -->
+          <section v-else-if="activeTab === 'send' && isBoss" key="send">
             <div class="page-header">
-              <div>
-                <h1>Отправить документ</h1>
-                <p class="page-sub">Создайте документ и отправьте сотруднику на подпись</p>
-              </div>
+              <div><h1>Отправить документ</h1><p class="page-sub">Создайте документ и отправьте сотруднику на подпись</p></div>
             </div>
             <div class="cards-grid">
               <div class="card">
@@ -479,13 +442,10 @@
             </div>
           </section>
 
-          <!-- ======== СОТРУДНИК: ПОДПИСАТЬ ======== -->
-          <section v-else-if="activeTab === 'sign'" key="sign">
+          <!-- ======== СОТРУДНИК: ПОДПИСАТЬ (только employee) ======== -->
+          <section v-else-if="activeTab === 'sign' && isEmployee" key="sign">
             <div class="page-header">
-              <div>
-                <h1>Подписать документ</h1>
-                <p class="page-sub">Подписание на основе номера телефона</p>
-              </div>
+              <div><h1>Подписать документ</h1><p class="page-sub">Подписание на основе номера телефона</p></div>
             </div>
             <div class="card card--narrow">
               <div class="card__title">Введите ID документа</div>
@@ -499,13 +459,11 @@
             </div>
           </section>
 
-          <!-- ======== АДМИНИСТРАТОР: МОНИТОРИНГ ======== -->
-          <section v-else-if="activeTab === 'admin_info'" key="admin_info">
+          <!-- ======== АДМИНИСТРАТОР: МОНИТОРИНГ (только admin) ======== -->
+          <section v-else-if="activeTab === 'admin_info' && isAdmin" key="admin_info">
             <div class="page-header">
-              <div>
-                <h1>Мониторинг системы</h1>
-                <p class="page-sub">Полный контроль документов и статусов</p>
-              </div>
+              <div><h1>Мониторинг системы</h1><p class="page-sub">Полный контроль документов и статусов</p></div>
+              <button class="btn btn--ghost btn--sm" @click="loadAllUsers">↻ Обновить пользователей</button>
             </div>
             <div class="cards-grid">
               <div class="card">
@@ -525,12 +483,37 @@
                 </div>
               </div>
               <div class="card">
-                <div class="card__title">📡 Последний ответ сервера</div>
-                <div class="json-preview">
-                  <pre>{{ pretty(output) }}</pre>
+                <div class="card__title">👥 Пользователи системы</div>
+                <div v-if="allUsers.length" class="doc-list">
+                  <div v-for="u in allUsers" :key="u.id" class="doc-row">
+                    <div class="doc-row__info">
+                      <span class="doc-title">{{ u.full_name }}</span>
+                      <span class="doc-id">{{ u.email }}</span>
+                    </div>
+                    <span class="doc-status" :class="{ 'doc-status--signed': u.role === 'admin', 'doc-status--pending': u.role === 'boss', 'doc-status--new': u.role === 'employee' }">
+                      {{ { admin: '🛡 Админ', boss: '👔 Начальник', employee: '👤 Сотрудник' }[u.role] ?? u.role }}
+                    </span>
+                  </div>
                 </div>
+                <div v-else class="empty-state" style="padding:16px 0">
+                  <p style="font-size:13px">Нажмите «Обновить пользователей»</p>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card__title">📡 Последний ответ сервера</div>
+                <div class="json-preview"><pre>{{ pretty(output) }}</pre></div>
                 <button class="btn btn--ghost btn--sm" style="margin-top:10px" @click="clearOutput">Очистить</button>
               </div>
+            </div>
+          </section>
+
+          <!-- ======== ДОСТУП ЗАПРЕЩЁН ======== -->
+          <section v-else key="forbidden">
+            <div class="empty-state" style="padding-top:80px">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>
+              <p style="font-size:15px;margin-top:8px">Доступ запрещён</p>
+              <p style="font-size:13px;color:var(--text-muted)">Эта страница недоступна для вашей роли</p>
+              <button class="btn btn--ghost btn--sm" style="margin-top:16px" @click="switchTab('home')">← На главную</button>
             </div>
           </section>
 
@@ -539,7 +522,7 @@
 
       <!-- STATUS BAR (только для admin) -->
       <transition name="slide-up">
-        <div v-if="output && userRole === 'admin'" class="status-bar">
+        <div v-if="output && isAdmin" class="status-bar">
           <span class="status-bar__label">Ответ:</span>
           <code class="status-bar__code">{{ shortOutput }}</code>
           <button class="status-bar__close" @click="clearOutput" aria-label="Закрыть">✕</button>
@@ -561,15 +544,14 @@ const authMode      = ref('login')
 const authLoading   = ref(false)
 const authError     = ref('')
 const theme         = ref('light')
-const userRole      = ref('employee')
+// userRole берётся ТОЛЬКО из ответа бэка — не меняется вручную
+const userRole      = ref('')
 const output        = ref(null)
 const inboxList     = ref([])
 const outboxList    = ref([])
 const pendingList   = ref([])
+const allUsers      = ref([])
 const statusResult  = ref(null)
-const inboxUserId   = ref(null)
-const outboxUserId  = ref(null)
-const pendingUserId = ref(null)
 
 const toast = reactive({ visible: false, message: '', type: 'success' })
 
@@ -578,7 +560,7 @@ const lastIds = reactive({
   department_id: null, document_id: null, recipient_user_id: null
 })
 
-const registerForm     = reactive({ full_name: '', email: '', phone: '', password: '' })
+const registerForm     = reactive({ full_name: '', email: '', phone: '', password: '', role: 'employee' })
 const loginForm        = reactive({ email: '', password: '' })
 const organizationForm = reactive({ name: '' })
 const departmentForm   = reactive({ organization_id: null, name: '' })
@@ -592,8 +574,13 @@ const sendForm     = reactive({ document_id: null, organization_id: null, depart
 const signForm     = reactive({ document_id: null })
 const statusForm   = reactive({ document_id: null, recipient_user_id: null })
 
-// ---- COMPUTED ----
-const roleIcon = computed(() => ({ admin: '🛡️', manager: '👔', employee: '👤' }[userRole.value] || '👤'))
+// ---- ROLE HELPERS ----
+const isAdmin    = computed(() => userRole.value === 'admin')
+const isBoss     = computed(() => userRole.value === 'boss')
+const isEmployee = computed(() => userRole.value === 'employee')
+
+const roleIcon = computed(() => ({ admin: '🛡️', boss: '👔', employee: '👤' }[userRole.value] || '👤'))
+const roleLabel = computed(() => ({ admin: 'Администратор', boss: 'Начальник', employee: 'Сотрудник' }[userRole.value] || userRole.value))
 
 const firstName = computed(() => {
   const name = currentUser.value?.full_name ?? ''
@@ -602,12 +589,13 @@ const firstName = computed(() => {
 
 const roleDescription = computed(() => ({
   admin:    'Администратор — полный контроль над системой',
-  manager:  'Начальник — создание и отправка документов на подпись',
+  boss:     'Начальник — создание и отправка документов на подпись',
   employee: 'Сотрудник — просмотр и подписание входящих документов'
 })[userRole.value] || '')
 
 const newCount = computed(() => inboxList.value.filter(d => d.status === 'new' || !d.status).length)
 
+// Вкладки строго по роли
 const visibleTabs = computed(() => {
   const common = [
     { key: 'home',          label: 'Главная' },
@@ -615,9 +603,9 @@ const visibleTabs = computed(() => {
     { key: 'read_unsigned', label: 'Не подписанные' },
     { key: 'signed',        label: 'Подписанные' },
   ]
-  if (userRole.value === 'manager')  return [...common, { key: 'send',       label: 'Отправить документ' }]
-  if (userRole.value === 'employee') return [...common, { key: 'sign',       label: 'Подписать' }]
-  if (userRole.value === 'admin')    return [...common, { key: 'admin_info', label: 'Мониторинг' }]
+  if (isBoss.value)     return [...common, { key: 'send',       label: 'Отправить документ' }]
+  if (isEmployee.value) return [...common, { key: 'sign',       label: 'Подписать' }]
+  if (isAdmin.value)    return [...common, { key: 'admin_info', label: 'Мониторинг' }]
   return common
 })
 
@@ -631,16 +619,13 @@ const shortOutput = computed(() => {
 function docStatusLabel(status) {
   return ({ new: 'Новое', pending: 'На подписи', signed: 'Подписан', read: 'Прочитано' }[status] || 'Новое')
 }
-
 function toggleTheme() { theme.value = theme.value === 'light' ? 'dark' : 'light' }
 function pretty(v)     { return (v == null) ? 'Нет данных' : JSON.stringify(v, null, 2) }
 function clearOutput() { output.value = null }
-function logout()      { token.value = null; currentUser.value = null; authMode.value = 'login'; authError.value = '' }
+function logout()      { token.value = null; currentUser.value = null; userRole.value = ''; authMode.value = 'login'; authError.value = '' }
 
 function showToast(message, type = 'success') {
-  toast.message = message
-  toast.type    = type
-  toast.visible = true
+  toast.message = message; toast.type = type; toast.visible = true
   setTimeout(() => { toast.visible = false }, 3500)
 }
 
@@ -649,6 +634,7 @@ function switchTab(key) {
   if (key === 'inbox')         loadInbox()
   if (key === 'read_unsigned') loadPending()
   if (key === 'signed')        loadOutbox()
+  if (key === 'admin_info')    loadAllUsers()
 }
 
 function normalizeError(data) {
@@ -672,8 +658,8 @@ function fillDocumentTemplate() { documentForm.title = 'Приказ о внут
 function fillDocumentIds()  { documentForm.organization_id = lastIds.organization_id; documentForm.department_id = lastIds.department_id }
 function fillSendIds()      { sendForm.document_id = lastIds.document_id; sendForm.organization_id = lastIds.organization_id; sendForm.department_id = lastIds.department_id; sendForm.recipient_user_id = lastIds.recipient_user_id ?? lastIds.user_id }
 function fillStatusIds()    { statusForm.document_id = lastIds.document_id; statusForm.recipient_user_id = lastIds.recipient_user_id ?? lastIds.user_id }
-function setSenderRole()    { roleForm.role_name = 'sender';  roleForm.can_send_document = true;  roleForm.can_sign_document = false; roleForm.can_manage_department = false }
-function setSignerRole()    { roleForm.role_name = 'signer';  roleForm.can_send_document = false; roleForm.can_sign_document = true;  roleForm.can_manage_department = false }
+function setSenderRole()    { roleForm.role_name = 'sender'; roleForm.can_send_document = true; roleForm.can_sign_document = false; roleForm.can_manage_department = false }
+function setSignerRole()    { roleForm.role_name = 'signer'; roleForm.can_send_document = false; roleForm.can_sign_document = true; roleForm.can_manage_department = false }
 
 // ---- API ----
 async function apiRequest(path, method = 'GET', body = null) {
@@ -697,8 +683,10 @@ async function apiRequest(path, method = 'GET', body = null) {
 async function registerUser() {
   authLoading.value = true; authError.value = ''
   try {
-    const data = await apiRequest('/auth/register', 'POST', registerForm)
-    if (data?.id) { lastIds.user_id = data.id; loginForm.email = registerForm.email; loginForm.password = registerForm.password; authMode.value = 'login' }
+    await apiRequest('/auth/register', 'POST', registerForm)
+    loginForm.email = registerForm.email
+    loginForm.password = registerForm.password
+    authMode.value = 'login'
     showToast('Регистрация успешна! Войдите в систему.')
   } catch(e) { authError.value = e.message } finally { authLoading.value = false }
 }
@@ -709,11 +697,13 @@ async function login() {
     const data = await apiRequest('/auth/login', 'POST', loginForm)
     if (data?.access_token) {
       token.value = data.access_token
-      const me = await apiRequest('/auth/me', 'GET')
-      currentUser.value = me; lastIds.user_id = me.id
-      inboxUserId.value = me.id; outboxUserId.value = me.id; pendingUserId.value = me.id
+      // Роль берётся из ответа /auth/login — не из select
+      userRole.value = data.role ?? 'employee'
+      currentUser.value = { id: data.user_id, full_name: data.full_name, email: data.email, role: data.role }
+      lastIds.user_id = data.user_id
       activeTab.value = 'home'
       loadInbox(); loadPending(); loadOutbox()
+      if (isAdmin.value) loadAllUsers()
     }
   } catch(e) { authError.value = e.message } finally { authLoading.value = false }
 }
@@ -764,24 +754,20 @@ async function signDocument() {
 
 async function quickSign(docId) { signForm.document_id = docId; await signDocument() }
 
-// ---- FIX: inbox/outbox/pending используют POST с body { user_id } ----
 async function loadInbox() {
-  const uid = inboxUserId.value ?? lastIds.user_id
-  if (!uid) return
+  const uid = lastIds.user_id; if (!uid) return
   try { const d = await apiRequest('/documents/inbox', 'POST', { user_id: uid }); inboxList.value = Array.isArray(d) ? d : [] }
   catch { inboxList.value = [] }
 }
 
 async function loadOutbox() {
-  const uid = outboxUserId.value ?? lastIds.user_id
-  if (!uid) return
+  const uid = lastIds.user_id; if (!uid) return
   try { const d = await apiRequest('/documents/outbox', 'POST', { user_id: uid }); outboxList.value = Array.isArray(d) ? d : [] }
   catch { outboxList.value = [] }
 }
 
 async function loadPending() {
-  const uid = pendingUserId.value ?? lastIds.user_id
-  if (!uid) return
+  const uid = lastIds.user_id; if (!uid) return
   try { const d = await apiRequest('/documents/pending', 'POST', { user_id: uid }); pendingList.value = Array.isArray(d) ? d : [] }
   catch { pendingList.value = [] }
 }
@@ -790,9 +776,32 @@ async function loadStatus() {
   try { statusResult.value = await apiRequest(`/documents/status/${statusForm.document_id}/${statusForm.recipient_user_id}`) }
   catch(e) { showToast(e.message, 'error') }
 }
+
+async function loadAllUsers() {
+  if (!isAdmin.value) return
+  try { const d = await apiRequest('/auth/users'); allUsers.value = Array.isArray(d) ? d : [] }
+  catch(e) { showToast(e.message, 'error') }
+}
 </script>
 
 <style scoped>
+.role-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--blue-tint, #e8f4fd);
+  color: var(--blue, #1a7fc4);
+  border: 1px solid rgba(26,127,196,0.18);
+  user-select: none;
+}
+.role-pill--admin  { background: #fff0f0; color: #c0392b; border-color: rgba(192,57,43,0.2); }
+.role-pill--boss   { background: #fffbea; color: #b8860b; border-color: rgba(184,134,11,0.2); }
+.role-pill--employee { background: #e8f4fd; color: #1a7fc4; border-color: rgba(26,127,196,0.18); }
+
 .field-label {
   display: flex;
   flex-direction: column;
@@ -812,11 +821,7 @@ async function loadStatus() {
 }
 .section-title-row .section-title { margin-bottom: 0; }
 
-.kpi-sub {
-  font-size: 11px;
-  color: var(--text-faint);
-  margin-top: 2px;
-}
+.kpi-sub { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
 
 .toast {
   position: fixed;
@@ -834,26 +839,9 @@ async function loadStatus() {
   max-width: 360px;
   border: 1px solid transparent;
 }
-.toast--success {
-  background: var(--success-tint);
-  color: var(--success);
-  border-color: rgba(30,138,82,0.2);
-}
-.toast--error {
-  background: var(--error-tint);
-  color: var(--error);
-  border-color: rgba(181,39,58,0.2);
-}
-.toast__close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  opacity: 0.6;
-  padding: 0 2px;
-  color: inherit;
-  margin-left: auto;
-}
+.toast--success { background: var(--success-tint); color: var(--success); border-color: rgba(30,138,82,0.2); }
+.toast--error   { background: var(--error-tint);   color: var(--error);   border-color: rgba(181,39,58,0.2); }
+.toast__close { background: none; border: none; cursor: pointer; font-size: 14px; opacity: 0.6; padding: 0 2px; color: inherit; margin-left: auto; }
 .toast__close:hover { opacity: 1; }
 
 .spinner { animation: spin 0.8s linear infinite; }
