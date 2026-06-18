@@ -20,6 +20,8 @@ class EmployeeResponse(BaseModel):
     organization_id: int
     department_id: Optional[int] = None
     role: str
+    full_name: Optional[str] = None
+    email: Optional[str] = None
 
     class Config:
         from_attributes = True
