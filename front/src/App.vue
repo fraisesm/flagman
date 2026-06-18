@@ -143,7 +143,7 @@
               </div>
               <div class="kpi-card" @click="switchTab('signed')" style="cursor:pointer">
                 <span class="kpi-label">Подписанных</span>
-                <span class="kpi-value kpi-value--ok">{{ outboxList.length }}</span>
+                <span class="kpi-value kpi-value--ok">{{ signedList.length }}</span>
                 <span class="kpi-sub">завершено</span>
               </div>
               <div v-if="isAdmin" class="kpi-card">
@@ -316,7 +316,7 @@
                     <label class="field-label">Получатель
                       <select v-model="sendForm.recipient_user_id" class="input">
                         <option :value="null" disabled>— выберите —</option>
-                        <option v-for="u in orgUsers" :key="u.id" :value="u.id">{{ u.full_name }} ({{ u.email }})</option>
+                        <option v-for="u in orgUsers" :key="u.id" :value="u.user_id ?? u.id">{{ u.full_name }} ({{ u.email }})</option>
                       </select>
                       <span v-if="usersLoading" class="hint">⏳ Загружаем сотрудников...</span>
                       <span v-else-if="sendForm.organization_id && !orgUsers.length" class="hint-warn">⚠ Нет сотрудников в этой организации</span>
@@ -405,14 +405,14 @@
           <!-- ======== ПОДПИСАННЫЕ ======== -->
           <section v-else-if="activeTab === 'signed'" key="signed">
             <div class="page-header">
-              <div><h1>Подписанные</h1><p class="page-sub">Завершённые документы</p></div>
-              <button class="btn btn--ghost btn--sm" @click="loadOutbox">↻ Обновить</button>
+              <div><h1>Подписанные</h1><p class="page-sub">Документы, которые вы подписали</p></div>
+              <button class="btn btn--ghost btn--sm" @click="loadSigned">↻ Обновить</button>
             </div>
-            <div v-if="outboxList.length" class="doc-list">
-              <div v-for="doc in outboxList" :key="doc.document_id" class="doc-row doc-row--signed">
+            <div v-if="signedList.length" class="doc-list">
+              <div v-for="doc in signedList" :key="doc.document_id" class="doc-row doc-row--signed">
                 <div class="doc-row__info">
                   <span class="doc-title">{{ doc.title ?? 'Dok. #' + doc.document_id }}</span>
-                  <span class="doc-id">ID: {{ doc.document_id }}</span>
+                  <span class="doc-id">ID: {{ doc.document_id }} &middot; От польз. #{{ doc.sender_user_id }}</span>
                 </div>
                 <span class="doc-status doc-status--signed">✓ Подписан</span>
               </div>
@@ -482,7 +482,7 @@
                   <label class="field-label">Получатель
                     <select v-model="sendForm.recipient_user_id" class="input">
                       <option :value="null" disabled>— выберите —</option>
-                      <option v-for="u in orgUsers" :key="u.id" :value="u.id">{{ u.full_name }} ({{ u.email }})</option>
+                      <option v-for="u in orgUsers" :key="u.id" :value="u.user_id ?? u.id">{{ u.full_name }} ({{ u.email }})</option>
                     </select>
                     <span v-if="usersLoading" class="hint">⏳ Загружаем сотрудников...</span>
                     <span v-else-if="sendForm.organization_id && !orgUsers.length" class="hint-warn">⚠ Нет сотрудников в этой организации</span>
@@ -611,7 +611,8 @@ const authError   = ref('')
 const theme       = ref('light')
 const output      = ref(null)
 const inboxList   = ref([])
-const outboxList  = ref([])
+const outboxList  = ref([])   // документы которые ты создал (исходящие)
+const signedList  = ref([])   // входящие которые ты подписал (status === 'signed')
 const pendingList = ref([])
 const allUsers    = ref([])
 const orgUsers    = ref([])
@@ -694,7 +695,7 @@ function switchTab(key) {
   activeTab.value = key
   if (key === 'inbox')         loadInbox()
   if (key === 'read_unsigned') loadPending()
-  if (key === 'signed')        loadOutbox()
+  if (key === 'signed')        loadSigned()
   if (key === 'admin_info')    loadAllUsers()
 }
 
@@ -718,7 +719,6 @@ function fillSendIds() {
 function setSenderRole() { roleForm.role_name = 'sender'; roleForm.can_send_document = true;  roleForm.can_sign_document = false; roleForm.can_manage_department = false }
 function setSignerRole()  { roleForm.role_name = 'signer'; roleForm.can_send_document = false; roleForm.can_sign_document = true;  roleForm.can_manage_department = false }
 
-// Вызывается при смене организации в форме отправки
 async function onSendOrgChange() {
   const orgId = sendForm.organization_id
   loadDepartmentsByOrg(orgId)
@@ -765,7 +765,7 @@ async function login() {
     currentUser.value = { id: data.user_id, full_name: data.full_name, email: data.email, role: data.role }
     lastIds.user_id   = data.user_id
     activeTab.value   = 'home'
-    loadInbox(); loadPending(); loadOutbox()
+    loadInbox(); loadPending(); loadSigned(); loadOutbox()
     loadOrganizations()
     if (userRole.value === 'admin') { loadAllUsers() }
   } catch(e) { authError.value = e.message } finally { authLoading.value = false }
@@ -845,22 +845,17 @@ async function createDepartment() {
   } catch(e) { showToast(e.message, 'error') }
 }
 
-// ---- USERS BY ORG (для выбора получателя) ----
-// Всегда делаем запрос к API — не полагаемся на кэш allUsers,
-// так как у boss нет доступа к /auth/users и allUsers у него пустой.
+// ---- USERS BY ORG ----
 async function loadUsersByOrg(orgId) {
   if (!orgId) return
   orgUsers.value = []
   usersLoading.value = true
   try {
-    // Пробуем публичный эндпоинт сотрудников организации
-    // Если бэкенд его поддерживает — используем его, иначе fallback на /auth/users
     let users = []
     try {
       const d = await apiRequest(`/employees/by-organization/${orgId}`)
       users = Array.isArray(d) ? d : []
     } catch {
-      // fallback: список всех пользователей (только для admin)
       try {
         const d = await apiRequest('/auth/users')
         users = Array.isArray(d) ? d : []
@@ -935,7 +930,7 @@ async function signDocument() {
   if (!signForm.document_id) return showToast('Укажите ID документа', 'error')
   try {
     await apiRequest('/signatures/sign', 'POST', { document_id: signForm.document_id })
-    loadPending(); loadInbox()
+    loadPending(); loadInbox(); loadSigned()
     showToast('Документ подписан!')
   } catch(e) { showToast(e.message, 'error') }
 }
@@ -959,6 +954,16 @@ async function loadOutbox() {
     const d = await apiRequest('/documents/outbox', 'POST', { user_id: lastIds.user_id })
     outboxList.value = Array.isArray(d) ? d : []
   } catch { outboxList.value = [] }
+}
+
+// Подписанные — входящие со статусом 'signed'
+async function loadSigned() {
+  if (!lastIds.user_id) return
+  try {
+    const d = await apiRequest('/documents/inbox', 'POST', { user_id: lastIds.user_id })
+    const all = Array.isArray(d) ? d : []
+    signedList.value = all.filter(doc => doc.status === 'signed')
+  } catch { signedList.value = [] }
 }
 
 async function loadPending() {
