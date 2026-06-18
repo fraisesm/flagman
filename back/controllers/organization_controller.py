@@ -32,7 +32,13 @@ def create_organization(
 def list_organizations(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     repo = OrganizationRepository(db)
     handler = ListOrganizationsHandler(repo)
-    return handler.handle(ListOrganizationsQuery(owner_id=current_user.id))
+    # Админ видит только свои организации (где он owner).
+    # Начальник и сотрудник видят все организации — чтобы выбрать свою.
+    if current_user.role == "admin":
+        query = ListOrganizationsQuery(owner_id=current_user.id, all_organizations=False)
+    else:
+        query = ListOrganizationsQuery(all_organizations=True)
+    return handler.handle(query)
 
 
 @router.get("/{organization_id}", response_model=OrganizationResponse)
