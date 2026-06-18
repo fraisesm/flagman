@@ -4,7 +4,7 @@ from typing import Optional
 
 class CreateOrganizationRequest(BaseModel):
     name: str
-    owner_id: int
+    # owner_id берётся автоматически из токена (current_user.id) — не передаётся клиентом
 
 
 class UpdateOrganizationRequest(BaseModel):
