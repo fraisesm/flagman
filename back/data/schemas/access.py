@@ -1,10 +1,11 @@
 from pydantic import BaseModel
+from typing import Optional
 
 
 class AssignRoleRequest(BaseModel):
     user_id: int
     organization_id: int
-    department_id: int
+    department_id: Optional[int] = None
     role_name: str
     can_send_document: bool = False
     can_sign_document: bool = False
@@ -22,7 +23,7 @@ class AccessResponse(BaseModel):
     id: int
     user_id: int
     organization_id: int
-    department_id: int
+    department_id: Optional[int] = None
     role_name: str
     can_send_document: bool
     can_sign_document: bool
