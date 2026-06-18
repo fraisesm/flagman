@@ -7,11 +7,12 @@ class SignatureRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, user_id: int, document_id: int, phone_signature: str):
+    def create(self, user_id: int, document_id: int, phone_signature: str, confirmation_channel: str = "phone"):
         signature = SignatureModel(
             user_id=user_id,
             document_id=document_id,
             phone_signature=phone_signature,
+            confirmation_channel=confirmation_channel,
         )
         self.db.add(signature)
 
