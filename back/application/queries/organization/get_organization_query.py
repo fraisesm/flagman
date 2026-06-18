@@ -4,5 +4,6 @@ class GetOrganizationQuery:
 
 
 class ListOrganizationsQuery:
-    def __init__(self, owner_id: int):
+    def __init__(self, owner_id: int = None, all_organizations: bool = False):
         self.owner_id = owner_id
+        self.all_organizations = all_organizations
