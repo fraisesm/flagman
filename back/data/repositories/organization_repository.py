@@ -17,6 +17,9 @@ class OrganizationRepository:
     def get_by_id(self, organization_id: int):
         return self.db.query(OrganizationModel).filter(OrganizationModel.id == organization_id).first()
 
+    def get_all(self):
+        return self.db.query(OrganizationModel).all()
+
     def get_all_by_owner(self, owner_id: int):
         return self.db.query(OrganizationModel).filter(OrganizationModel.owner_id == owner_id).all()
 
