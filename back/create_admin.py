@@ -16,8 +16,29 @@ import data.models.document_model  # noqa
 import data.models.document_recipient_model  # noqa
 import data.models.signature_model  # noqa
 
-# 2. Создаём таблицы (если уже есть — ничего не случится)
-Base.metadata.create_all(bind=engine)
+from sqlalchemy import inspect, text
+
+# 2. Проверяем есть ли колонка role. Если нет — добавляем
+with engine.connect() as conn:
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+
+    if "users" not in tables:
+        print("[ℹ] Таблицы отсутствуют, создаю...")
+        Base.metadata.create_all(bind=engine)
+    else:
+        columns = [c["name"] for c in inspector.get_columns("users")]
+        if "role" not in columns:
+            print("[ℹ] Колонка 'role' отсутствует, добавляю...")
+            conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR NOT NULL DEFAULT 'employee'"))
+            conn.commit()
+            print("[✓] Колонка 'role' добавлена")
+        else:
+            print("[✓] Структура таблицы актуальна")
+
+    # Остальные таблицы тоже создаём если нужно
+    Base.metadata.create_all(bind=engine)
+
 print("[✓] Таблицы готовы")
 
 from data.repositories.user_repository import UserRepository
@@ -35,7 +56,7 @@ repo = UserRepository(db)
 try:
     existing = repo.get_by_email(ADMIN_EMAIL)
     if existing:
-        print(f"[INFO] Admin уже существует: {ADMIN_EMAIL}")
+        print(f"[ℹ] Admin уже существует: {ADMIN_EMAIL}")
     else:
         admin = User(
             full_name=ADMIN_NAME,
