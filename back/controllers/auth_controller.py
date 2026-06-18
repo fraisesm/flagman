@@ -70,7 +70,17 @@ def get_all_users(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Только для admin — список всех пользователей"""
+    """Только для admin — полный список пользователей"""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Доступ запрещён")
+    return UserRepository(db).get_all()
+
+
+@router.get("/users-public", response_model=list[UserMeResponse])
+def get_users_public(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Доступно всем авторизованным пользователям — для выбора получателя.
+    Возвращает только базовые поля: id, full_name, email, role."""
     return UserRepository(db).get_all()
