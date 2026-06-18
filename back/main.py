@@ -18,6 +18,7 @@ from controllers.employee_controller import router as employee_router
 from controllers.access_controller import router as access_router
 from controllers.document_controller import router as document_router
 from controllers.signature_controller import router as signature_router
+from controllers.admin_controller import router as admin_router
 
 app = FastAPI(title="Document Signing Service")
 
@@ -39,6 +40,7 @@ app.include_router(employee_router)
 app.include_router(access_router)
 app.include_router(document_router)
 app.include_router(signature_router)
+app.include_router(admin_router)
 
 
 @app.get("/")
