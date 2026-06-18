@@ -1,12 +1,27 @@
 from sqlalchemy.orm import Session
 from data.models.document_model import DocumentModel
 from data.models.document_recipient_model import DocumentRecipientModel
+from domain.document.document import Document
 
 
 class DocumentRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    def create_document(self, document: Document):
+        model = DocumentModel(
+            title=document.title,
+            content=document.content,
+            sender_user_id=document.sender_user_id,
+            organization_id=document.organization_id,
+            department_id=document.department_id,
+        )
+        self.db.add(model)
+        self.db.commit()
+        self.db.refresh(model)
+        return model
+
+    # alias for backward compatibility
     def create(self, model: DocumentModel):
         self.db.add(model)
         self.db.commit()
@@ -42,7 +57,6 @@ class DocumentRepository:
         return recipient
 
     def get_existing_recipient(self, document_id: int, recipient_user_id: int):
-        """Check if a recipient record already exists for this document+user pair."""
         return (
             self.db.query(DocumentRecipientModel)
             .filter(
@@ -53,7 +67,6 @@ class DocumentRepository:
         )
 
     def send_to_recipient(self, document_id: int, recipient_user_id: int):
-        """Create a new recipient record with status 'pending'."""
         recipient = DocumentRecipientModel(
             document_id=document_id,
             recipient_user_id=recipient_user_id,
