@@ -272,30 +272,53 @@
                     <label class="field-label">Содержимое
                       <textarea v-model="documentForm.content" class="input textarea" placeholder="Текст документа..." rows="3"></textarea>
                     </label>
-                    <label class="field-label">Организация (ID)
-                      <input v-model.number="documentForm.organization_id" class="input" type="number" placeholder="1" />
+                    <label class="field-label">Организация
+                      <select v-model="documentForm.organization_id" class="input" @change="loadDepartmentsByOrg(documentForm.organization_id)">
+                        <option :value="null" disabled>— выберите —</option>
+                        <option v-for="o in organizations" :key="o.id" :value="o.id">{{ o.name }}</option>
+                      </select>
+                      <span v-if="!organizations.length" class="hint-warn">⚠ Организаций нет. Попросите администратора создать организацию и добавить вас.</span>
                     </label>
-                    <label class="field-label">Отдел (ID)
-                      <input v-model.number="documentForm.department_id" class="input" type="number" placeholder="1" />
+                    <label class="field-label">Отдел
+                      <select v-model="documentForm.department_id" class="input">
+                        <option :value="null" disabled>— выберите —</option>
+                        <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
+                      </select>
                     </label>
-                    <button class="btn btn--primary" @click="createDocument">Создать документ</button>
+                    <button class="btn btn--primary" @click="createDocument" :disabled="!documentForm.organization_id || !documentForm.department_id">Создать документ</button>
                   </div>
                   <p v-if="lastIds.document_id" class="hint success">✓ Создан, ID: <code>{{ lastIds.document_id }}</code></p>
                 </div>
                 <div class="card">
                   <div class="card__title">📨 Отправить на подпись</div>
                   <div class="form-col">
-                    <label class="field-label">ID документа
-                      <input v-model.number="sendForm.document_id" class="input" type="number" placeholder="1" />
+                    <label class="field-label">Документ
+                      <select v-model="sendForm.document_id" class="input">
+                        <option :value="null" disabled>— выберите —</option>
+                        <option v-for="doc in sentDocuments" :key="doc.id" :value="doc.id">{{ doc.title }} (ID: {{ doc.id }})</option>
+                      </select>
+                      <span v-if="lastIds.document_id && !sendForm.document_id" class="hint">
+                        <button class="link-btn" @click="sendForm.document_id = lastIds.document_id">Использовать последний (ID: {{ lastIds.document_id }})</button>
+                      </span>
                     </label>
-                    <label class="field-label">ID организации
-                      <input v-model.number="sendForm.organization_id" class="input" type="number" placeholder="1" />
+                    <label class="field-label">Организация
+                      <select v-model="sendForm.organization_id" class="input" @change="loadDepartmentsByOrg(sendForm.organization_id); loadUsersByOrg(sendForm.organization_id)">
+                        <option :value="null" disabled>— выберите —</option>
+                        <option v-for="o in organizations" :key="o.id" :value="o.id">{{ o.name }}</option>
+                      </select>
                     </label>
-                    <label class="field-label">ID отдела
-                      <input v-model.number="sendForm.department_id" class="input" type="number" placeholder="1" />
+                    <label class="field-label">Отдел
+                      <select v-model="sendForm.department_id" class="input">
+                        <option :value="null" disabled>— выберите —</option>
+                        <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
+                      </select>
                     </label>
-                    <label class="field-label">ID получателя
-                      <input v-model.number="sendForm.recipient_user_id" class="input" type="number" placeholder="2" />
+                    <label class="field-label">Получатель
+                      <select v-model="sendForm.recipient_user_id" class="input">
+                        <option :value="null" disabled>— выберите —</option>
+                        <option v-for="u in orgUsers" :key="u.id" :value="u.id">{{ u.full_name }} ({{ u.email }})</option>
+                      </select>
+                      <span v-if="!orgUsers.length && sendForm.organization_id" class="hint-warn">⚠ Выберите организацию для загрузки сотрудников</span>
                     </label>
                     <button class="btn btn--ghost btn--sm" @click="fillSendIds">Подставить ID из последнего</button>
                     <button class="btn btn--primary" @click="sendDocument">Отправить</button>
@@ -414,30 +437,52 @@
                   <label class="field-label">Содержимое
                     <textarea v-model="documentForm.content" class="input textarea" rows="4" placeholder="Текст..."></textarea>
                   </label>
-                  <label class="field-label">Организация (ID)
-                    <input v-model.number="documentForm.organization_id" class="input" type="number" placeholder="1" />
+                  <label class="field-label">Организация
+                    <select v-model="documentForm.organization_id" class="input" @change="loadDepartmentsByOrg(documentForm.organization_id)">
+                      <option :value="null" disabled>— выберите —</option>
+                      <option v-for="o in organizations" :key="o.id" :value="o.id">{{ o.name }}</option>
+                    </select>
+                    <span v-if="!organizations.length" class="hint-warn">⚠ Нет организаций. Обратитесь к администратору.</span>
                   </label>
-                  <label class="field-label">Отдел (ID)
-                    <input v-model.number="documentForm.department_id" class="input" type="number" placeholder="1" />
+                  <label class="field-label">Отдел
+                    <select v-model="documentForm.department_id" class="input">
+                      <option :value="null" disabled>— выберите —</option>
+                      <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
+                    </select>
                   </label>
-                  <button class="btn btn--primary" @click="createDocument">Создать документ</button>
+                  <button class="btn btn--primary" @click="createDocument" :disabled="!documentForm.organization_id || !documentForm.department_id">Создать документ</button>
                 </div>
                 <p v-if="lastIds.document_id" class="hint success">✓ ID: <code>{{ lastIds.document_id }}</code></p>
               </div>
               <div class="card">
                 <div class="card__title">Шаг 2 — Отправить получателю</div>
                 <div class="form-col">
-                  <label class="field-label">ID документа
-                    <input v-model.number="sendForm.document_id" class="input" type="number" />
+                  <label class="field-label">Документ
+                    <select v-model="sendForm.document_id" class="input">
+                      <option :value="null" disabled>— выберите —</option>
+                      <option v-for="doc in sentDocuments" :key="doc.id" :value="doc.id">{{ doc.title }} (ID: {{ doc.id }})</option>
+                    </select>
+                    <span v-if="lastIds.document_id && !sendForm.document_id" class="hint">
+                      <button class="link-btn" @click="sendForm.document_id = lastIds.document_id">Использовать последний (ID: {{ lastIds.document_id }})</button>
+                    </span>
                   </label>
-                  <label class="field-label">ID организации
-                    <input v-model.number="sendForm.organization_id" class="input" type="number" />
+                  <label class="field-label">Организация
+                    <select v-model="sendForm.organization_id" class="input" @change="loadDepartmentsByOrg(sendForm.organization_id); loadUsersByOrg(sendForm.organization_id)">
+                      <option :value="null" disabled>— выберите —</option>
+                      <option v-for="o in organizations" :key="o.id" :value="o.id">{{ o.name }}</option>
+                    </select>
                   </label>
-                  <label class="field-label">ID отдела
-                    <input v-model.number="sendForm.department_id" class="input" type="number" />
+                  <label class="field-label">Отдел
+                    <select v-model="sendForm.department_id" class="input">
+                      <option :value="null" disabled>— выберите —</option>
+                      <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
+                    </select>
                   </label>
-                  <label class="field-label">ID получателя
-                    <input v-model.number="sendForm.recipient_user_id" class="input" type="number" />
+                  <label class="field-label">Получатель
+                    <select v-model="sendForm.recipient_user_id" class="input">
+                      <option :value="null" disabled>— выберите —</option>
+                      <option v-for="u in orgUsers" :key="u.id" :value="u.id">{{ u.full_name }} ({{ u.email }})</option>
+                    </select>
                   </label>
                   <button class="btn btn--ghost btn--sm" @click="fillSendIds">Подставить ID</button>
                   <button class="btn btn--primary" @click="sendDocument">Отправить</button>
@@ -566,9 +611,11 @@ const inboxList   = ref([])
 const outboxList  = ref([])
 const pendingList = ref([])
 const allUsers    = ref([])
+const orgUsers    = ref([])
 const organizations = ref([])
 const departments   = ref([])
 const statusResult  = ref(null)
+const sentDocuments = ref([])
 
 const toast = reactive({ visible: false, message: '', type: 'success' })
 const lastIds = reactive({ user_id: null, organization_id: null, department_id: null, document_id: null })
@@ -656,9 +703,9 @@ function normalizeError(data) {
 }
 
 function fillSendIds() {
-  sendForm.document_id    = lastIds.document_id
+  sendForm.document_id     = lastIds.document_id
   sendForm.organization_id = lastIds.organization_id
-  sendForm.department_id  = lastIds.department_id
+  sendForm.department_id   = lastIds.department_id
 }
 
 function setSenderRole() { roleForm.role_name = 'sender'; roleForm.can_send_document = true;  roleForm.can_sign_document = false; roleForm.can_manage_department = false }
@@ -697,7 +744,6 @@ async function registerUser() {
 async function login() {
   authLoading.value = true; authError.value = ''
   try {
-    // POST /auth/login → {access_token, user_id, full_name, email, role}
     const data = await apiRequest('/auth/login', 'POST', loginForm)
     if (!data?.access_token) throw new Error('Нет токена в ответе')
     token.value    = data.access_token
@@ -705,26 +751,32 @@ async function login() {
     currentUser.value = { id: data.user_id, full_name: data.full_name, email: data.email, role: data.role }
     lastIds.user_id   = data.user_id
     activeTab.value   = 'home'
-    // Загрузить документы
     loadInbox(); loadPending(); loadOutbox()
-    // Админ: дополнительные данные
-    if (userRole.value === 'admin') { loadAllUsers(); loadOrganizations() }
+    // Загружаем организации для всех ролей, кому нужны формы
+    loadOrganizations()
+    if (userRole.value === 'admin') { loadAllUsers() }
   } catch(e) { authError.value = e.message } finally { authLoading.value = false }
 }
 
 // ---- ORGANIZATIONS ----
 async function loadOrganizations() {
   try {
-    // GET /organizations/
     const d = await apiRequest('/organizations/')
     organizations.value = Array.isArray(d) ? d : []
+    // Если одна организация — автовыбираем её
+    if (organizations.value.length === 1) {
+      const orgId = organizations.value[0].id
+      documentForm.organization_id = orgId
+      sendForm.organization_id = orgId
+      lastIds.organization_id = orgId
+      loadDepartmentsByOrg(orgId)
+    }
   } catch(e) { showToast(e.message, 'error') }
 }
 
 async function createOrganization() {
   if (!organizationForm.name.trim()) return showToast('Укажите название', 'error')
   try {
-    // POST /organizations/
     const data = await apiRequest('/organizations/', 'POST', { name: organizationForm.name })
     if (data?.id) {
       lastIds.organization_id = data.id
@@ -741,7 +793,6 @@ async function createOrganization() {
 
 async function deleteOrganization(id) {
   try {
-    // DELETE /organizations/{id}
     await apiRequest(`/organizations/${id}`, 'DELETE')
     showToast('Организация удалена')
     loadOrganizations()
@@ -752,16 +803,21 @@ async function deleteOrganization(id) {
 async function loadDepartmentsByOrg(orgId) {
   if (!orgId) return
   try {
-    // GET /departments/by-organization/{org_id}
     const d = await apiRequest(`/departments/by-organization/${orgId}`)
     departments.value = Array.isArray(d) ? d : []
+    // Если один отдел — автовыбираем
+    if (departments.value.length === 1) {
+      const deptId = departments.value[0].id
+      documentForm.department_id = deptId
+      sendForm.department_id = deptId
+      lastIds.department_id = deptId
+    }
   } catch(e) { departments.value = [] }
 }
 
 async function createDepartment() {
   if (!departmentForm.organization_id || !departmentForm.name.trim()) return showToast('Заполните организацию и название', 'error')
   try {
-    // POST /departments/  {organization_id, name}
     const data = await apiRequest('/departments/', 'POST', {
       organization_id: departmentForm.organization_id,
       name: departmentForm.name
@@ -777,11 +833,30 @@ async function createDepartment() {
   } catch(e) { showToast(e.message, 'error') }
 }
 
+// ---- USERS BY ORG (для выбора получателя) ----
+async function loadUsersByOrg(orgId) {
+  if (!orgId) return
+  try {
+    // Используем всех пользователей системы, если доступны, иначе пустой список
+    // Для boss — загружаем через /auth/users если разрешено, или показываем список allUsers
+    if (allUsers.value.length) {
+      orgUsers.value = allUsers.value
+    } else {
+      try {
+        const d = await apiRequest('/auth/users')
+        allUsers.value = Array.isArray(d) ? d : []
+        orgUsers.value = allUsers.value
+      } catch {
+        orgUsers.value = []
+      }
+    }
+  } catch(e) { orgUsers.value = [] }
+}
+
 // ---- EMPLOYEES ----
 async function inviteEmployee() {
   if (!inviteForm.user_id || !inviteForm.organization_id) return showToast('Выберите пользователя и организацию', 'error')
   try {
-    // POST /employees/invite  {user_id, organization_id}
     await apiRequest('/employees/invite', 'POST', inviteForm)
     showToast('Сотрудник приглашён!')
   } catch(e) { showToast(e.message, 'error') }
@@ -790,7 +865,6 @@ async function inviteEmployee() {
 // ---- ACCESS/ROLES ----
 async function assignRole() {
   try {
-    // POST /access/assign-role
     await apiRequest('/access/assign-role', 'POST', roleForm)
     showToast('Роль выдана!')
   } catch(e) { showToast(e.message, 'error') }
@@ -799,27 +873,37 @@ async function assignRole() {
 // ---- DOCUMENTS ----
 async function createDocument() {
   if (!documentForm.title.trim()) return showToast('Укажите заголовок', 'error')
+  if (!documentForm.organization_id) return showToast('Выберите организацию', 'error')
+  if (!documentForm.department_id) return showToast('Выберите отдел', 'error')
   try {
-    // POST /documents/create  (токен идёт в Authorization — бэк сам подставляет sender_user_id)
     const data = await apiRequest('/documents/create', 'POST', {
       title: documentForm.title,
       content: documentForm.content,
-      organization_id: documentForm.organization_id,
-      department_id: documentForm.department_id
+      organization_id: Number(documentForm.organization_id),
+      department_id: Number(documentForm.department_id)
     })
     if (data?.id) {
       lastIds.document_id = data.id
       sendForm.document_id = data.id
+      // Добавляем в список созданных документов для выпадашки отправки
+      sentDocuments.value.push({ id: data.id, title: documentForm.title })
     }
     showToast('Документ создан!')
   } catch(e) { showToast(e.message, 'error') }
 }
 
 async function sendDocument() {
-  if (!sendForm.document_id || !sendForm.recipient_user_id) return showToast('Укажите ID документа и получателя', 'error')
+  if (!sendForm.document_id) return showToast('Выберите документ', 'error')
+  if (!sendForm.organization_id) return showToast('Выберите организацию', 'error')
+  if (!sendForm.department_id) return showToast('Выберите отдел', 'error')
+  if (!sendForm.recipient_user_id) return showToast('Выберите получателя', 'error')
   try {
-    // POST /documents/send
-    await apiRequest('/documents/send', 'POST', sendForm)
+    await apiRequest('/documents/send', 'POST', {
+      document_id: Number(sendForm.document_id),
+      organization_id: Number(sendForm.organization_id),
+      department_id: Number(sendForm.department_id),
+      recipient_user_id: Number(sendForm.recipient_user_id)
+    })
     showToast('Документ отправлен!')
   } catch(e) { showToast(e.message, 'error') }
 }
@@ -827,7 +911,6 @@ async function sendDocument() {
 async function signDocument() {
   if (!signForm.document_id) return showToast('Укажите ID документа', 'error')
   try {
-    // POST /signatures/sign  {document_id}
     await apiRequest('/signatures/sign', 'POST', { document_id: signForm.document_id })
     loadPending(); loadInbox()
     showToast('Документ подписан!')
@@ -842,7 +925,6 @@ async function quickSign(docId) {
 async function loadInbox() {
   if (!lastIds.user_id) return
   try {
-    // POST /documents/inbox  {user_id}
     const d = await apiRequest('/documents/inbox', 'POST', { user_id: lastIds.user_id })
     inboxList.value = Array.isArray(d) ? d : []
   } catch { inboxList.value = [] }
@@ -851,7 +933,6 @@ async function loadInbox() {
 async function loadOutbox() {
   if (!lastIds.user_id) return
   try {
-    // POST /documents/outbox  {user_id}
     const d = await apiRequest('/documents/outbox', 'POST', { user_id: lastIds.user_id })
     outboxList.value = Array.isArray(d) ? d : []
   } catch { outboxList.value = [] }
@@ -860,7 +941,6 @@ async function loadOutbox() {
 async function loadPending() {
   if (!lastIds.user_id) return
   try {
-    // POST /documents/pending  {user_id}
     const d = await apiRequest('/documents/pending', 'POST', { user_id: lastIds.user_id })
     pendingList.value = Array.isArray(d) ? d : []
   } catch { pendingList.value = [] }
@@ -869,7 +949,6 @@ async function loadPending() {
 async function loadStatus() {
   if (!statusForm.document_id || !statusForm.recipient_user_id) return showToast('Укажите ID документа и получателя', 'error')
   try {
-    // GET /documents/status/{doc_id}/{recipient_id}
     statusResult.value = await apiRequest(`/documents/status/${statusForm.document_id}/${statusForm.recipient_user_id}`)
   } catch(e) { showToast(e.message, 'error') }
 }
@@ -877,7 +956,6 @@ async function loadStatus() {
 async function loadAllUsers() {
   if (!isAdmin.value) return
   try {
-    // GET /auth/users  (только для admin)
     const d = await apiRequest('/auth/users')
     allUsers.value = Array.isArray(d) ? d : []
   } catch(e) { showToast(e.message, 'error') }
@@ -899,6 +977,11 @@ async function loadAllUsers() {
   display: flex; flex-direction: column; gap: 5px;
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .06em; color: var(--text-muted);
+}
+
+.hint-warn {
+  font-size: 11px; color: #b8860b; font-weight: 500;
+  text-transform: none; letter-spacing: 0;
 }
 
 .mini-list { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
