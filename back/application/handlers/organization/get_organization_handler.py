@@ -18,4 +18,6 @@ class ListOrganizationsHandler:
         self.repository = repository
 
     def handle(self, query: ListOrganizationsQuery):
+        if query.all_organizations:
+            return self.repository.get_all()
         return self.repository.get_all_by_owner(query.owner_id)
