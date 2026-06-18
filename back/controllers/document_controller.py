@@ -1,125 +1,167 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import List
 
 from application.commands.document.create_document import CreateDocumentCommand
 from application.commands.document.send_document import SendDocumentCommand
 from application.handlers.document.create_document_handler import CreateDocumentHandler
 from application.handlers.document.send_document_handler import SendDocumentHandler
-from data.db import get_db
-from data.repositories.access_repository import AccessRepository
-from data.repositories.document_repository import DocumentRepository
-from data.schemas.document import CreateDocumentRequest, SendDocumentRequest
-
 from application.handlers.document.get_inbox_handler import GetInboxHandler
 from application.handlers.document.get_outbox_handler import GetOutboxHandler
+from application.handlers.document.get_pending_inbox_handler import GetPendingInboxHandler
+from application.dependencies.auth import get_current_user
+from data.db import get_db
+from data.repositories.document_repository import DocumentRepository
+from data.repositories.access_repository import AccessRepository
 from data.schemas.document import (
     CreateDocumentRequest,
+    UpdateDocumentRequest,
     SendDocumentRequest,
     InboxRequest,
     OutboxRequest,
+    DocumentResponse,
 )
-
-from application.handlers.document.get_pending_inbox_handler import GetPendingInboxHandler
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
-@router.post("/create")
-def create_document(request: CreateDocumentRequest, db: Session = Depends(get_db)):
-    repository = DocumentRepository(db)
-    handler = CreateDocumentHandler(repository)
-
+@router.post("/create", response_model=DocumentResponse)
+def create_document(
+    request: CreateDocumentRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = DocumentRepository(db)
+    handler = CreateDocumentHandler(repo)
     command = CreateDocumentCommand(
         title=request.title,
         content=request.content,
-        sender_user_id=request.sender_user_id,
+        sender_user_id=current_user.id,
         organization_id=request.organization_id,
         department_id=request.department_id,
     )
+    return handler.handle(command)
 
-    document = handler.handle(command)
 
-    return {
-        "id": document.id,  # type: ignore
-        "title": document.title,  # type: ignore
-        "content": document.content,  # type: ignore
-        "sender_user_id": document.sender_user_id,  # type: ignore
-        "organization_id": document.organization_id,  # type: ignore
-        "department_id": document.department_id,  # type: ignore
-    }
+@router.get("/{document_id}", response_model=DocumentResponse)
+def get_document(document_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    repo = DocumentRepository(db)
+    doc = repo.get_by_id(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    return doc
+
+
+@router.put("/{document_id}", response_model=DocumentResponse)
+def update_document(
+    document_id: int,
+    request: UpdateDocumentRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = DocumentRepository(db)
+    doc = repo.get_by_id(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    if doc.sender_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    return repo.update(document_id, request.title, request.content)
+
+
+@router.delete("/{document_id}")
+def delete_document(document_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    repo = DocumentRepository(db)
+    doc = repo.get_by_id(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    if doc.sender_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    repo.delete(document_id)
+    return {"detail": "Документ удалён"}
 
 
 @router.post("/send")
-def send_document(request: SendDocumentRequest, db: Session = Depends(get_db)):
+def send_document(
+    request: SendDocumentRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     document_repository = DocumentRepository(db)
     access_repository = AccessRepository(db)
     handler = SendDocumentHandler(document_repository, access_repository)
-
     command = SendDocumentCommand(
         document_id=request.document_id,
-        sender_user_id=request.sender_user_id,
+        sender_user_id=current_user.id,
         organization_id=request.organization_id,
         department_id=request.department_id,
         recipient_user_id=request.recipient_user_id,
     )
-
     try:
         recipient = handler.handle(command)
         return {
-            "id": recipient.id,  # type: ignore
-            "document_id": recipient.document_id,  # type: ignore
-            "recipient_user_id": recipient.recipient_user_id,  # type: ignore
-            "status": recipient.status,  # type: ignore
+            "id": recipient.id,
+            "document_id": recipient.document_id,
+            "recipient_user_id": recipient.recipient_user_id,
+            "status": recipient.status,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
 
 @router.post("/inbox")
-def get_inbox(request: InboxRequest, db: Session = Depends(get_db)):
-    repository = DocumentRepository(db)
-    handler = GetInboxHandler(repository)
-
+def get_inbox(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    repo = DocumentRepository(db)
+    handler = GetInboxHandler(repo)
     items = handler.handle(request.user_id)
-
-    result = []
-    for recipient, document in items:
-        result.append(
-            {
-                "document_id": document.id,  # type: ignore
-                "title": document.title,  # type: ignore
-                "content": document.content,  # type: ignore
-                "sender_user_id": document.sender_user_id,  # type: ignore
-                "organization_id": document.organization_id,  # type: ignore
-                "department_id": document.department_id,  # type: ignore
-                "status": recipient.status,  # type: ignore
-            }
-        )
-
-    return result
+    return [
+        {
+            "document_id": doc.id,
+            "title": doc.title,
+            "content": doc.content,
+            "sender_user_id": doc.sender_user_id,
+            "organization_id": doc.organization_id,
+            "department_id": doc.department_id,
+            "status": r.status,
+        }
+        for r, doc in items
+    ]
 
 
 @router.post("/outbox")
-def get_outbox(request: OutboxRequest, db: Session = Depends(get_db)):
-    repository = DocumentRepository(db)
-    handler = GetOutboxHandler(repository)
-
+def get_outbox(request: OutboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    repo = DocumentRepository(db)
+    handler = GetOutboxHandler(repo)
     documents = handler.handle(request.user_id)
+    return [
+        {
+            "document_id": doc.id,
+            "title": doc.title,
+            "content": doc.content,
+            "sender_user_id": doc.sender_user_id,
+            "organization_id": doc.organization_id,
+            "department_id": doc.department_id,
+        }
+        for doc in documents
+    ]
 
-    result = []
-    for document in documents:
-        result.append(
-            {
-                "document_id": document.id,  # type: ignore
-                "title": document.title,  # type: ignore
-                "content": document.content,  # type: ignore
-                "sender_user_id": document.sender_user_id,  # type: ignore
-                "organization_id": document.organization_id,  # type: ignore
-                "department_id": document.department_id,  # type: ignore
-            }
-        )
 
-    return result
+@router.post("/pending")
+def get_pending(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    repo = DocumentRepository(db)
+    handler = GetPendingInboxHandler(repo)
+    items = handler.handle(request.user_id)
+    return [
+        {
+            "document_id": doc.id,
+            "title": doc.title,
+            "content": doc.content,
+            "sender_user_id": doc.sender_user_id,
+            "organization_id": doc.organization_id,
+            "department_id": doc.department_id,
+            "status": r.status,
+        }
+        for r, doc in items
+    ]
 
 
 @router.get("/status/{document_id}/{recipient_user_id}")
@@ -127,34 +169,10 @@ def get_document_status(
     document_id: int,
     recipient_user_id: int,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    repository = DocumentRepository(db)
-    status = repository.get_document_status_for_user(document_id, recipient_user_id)
-
+    repo = DocumentRepository(db)
+    status = repo.get_document_status_for_user(document_id, recipient_user_id)
     if not status:
-        raise HTTPException(status_code=404, detail="Статус документа не найден")
-
-    return status   
-
-@router.post("/pending")
-def get_pending_documents(request: InboxRequest, db: Session = Depends(get_db)):
-    repository = DocumentRepository(db)
-    handler = GetPendingInboxHandler(repository)
-
-    items = handler.handle(request.user_id)
-
-    result = []
-    for recipient, document in items:
-        result.append(
-            {
-                "document_id": document.id,  # type: ignore
-                "title": document.title,  # type: ignore
-                "content": document.content,  # type: ignore
-                "sender_user_id": document.sender_user_id,  # type: ignore
-                "organization_id": document.organization_id,  # type: ignore
-                "department_id": document.department_id,  # type: ignore
-                "status": recipient.status,  # type: ignore
-            }
-        )
-
-    return result
+        raise HTTPException(status_code=404, detail="Статус не найден")
+    return status
