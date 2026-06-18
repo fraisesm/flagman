@@ -4,6 +4,7 @@ from typing import List
 
 from application.handlers.signature.sign_document_handler import SignDocumentHandler
 from application.dependencies.auth import get_current_user
+from application.dependencies.roles import require_employee
 from data.db import get_db
 from data.repositories.signature_repository import SignatureRepository
 from data.repositories.document_repository import DocumentRepository
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/signatures", tags=["Signatures"])
 def sign_document(
     request: SignDocumentRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_employee),   # ← только employee / admin
 ):
     handler = SignDocumentHandler(
         signature_repository=SignatureRepository(db),

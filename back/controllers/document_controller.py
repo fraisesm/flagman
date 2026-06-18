@@ -17,6 +17,7 @@ from application.handlers.document.get_read_inbox_handler import GetReadInboxHan
 from application.handlers.document.get_signed_inbox_handler import GetSignedInboxHandler
 from application.handlers.document.mark_as_read_handler import MarkAsReadHandler
 from application.dependencies.auth import get_current_user
+from application.dependencies.roles import require_boss_or_admin, require_employee
 from data.db import get_db
 from data.repositories.document_repository import DocumentRepository
 from data.repositories.access_repository import AccessRepository
@@ -36,11 +37,13 @@ from data.schemas.document import (
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
+# ---- Создание / редактирование — только boss / admin ----
+
 @router.post("/create", response_model=DocumentResponse)
 def create_document(
     request: CreateDocumentRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_boss_or_admin),
 ):
     repo = DocumentRepository(db)
     handler = CreateDocumentHandler(repo)
@@ -54,8 +57,37 @@ def create_document(
     return handler.handle(command)
 
 
+@router.get("/unread-count/{user_id}")
+def get_unread_count(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = DocumentRepository(db)
+    count = repo.get_unread_count(user_id)
+    return {"unread_count": count}
+
+
+@router.get("/status/{document_id}/{recipient_user_id}")
+def get_document_status(
+    document_id: int,
+    recipient_user_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = DocumentRepository(db)
+    status = repo.get_document_status_for_user(document_id, recipient_user_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Статус не найден")
+    return status
+
+
 @router.get("/{document_id}", response_model=DocumentResponse)
-def get_document(document_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     repo = DocumentRepository(db)
     doc = repo.get_by_id(document_id)
     if not doc:
@@ -68,7 +100,7 @@ def update_document(
     document_id: int,
     request: UpdateDocumentRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_boss_or_admin),
 ):
     repo = DocumentRepository(db)
     doc = repo.get_by_id(document_id)
@@ -80,7 +112,11 @@ def update_document(
 
 
 @router.delete("/{document_id}")
-def delete_document(document_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_boss_or_admin),
+):
     repo = DocumentRepository(db)
     doc = repo.get_by_id(document_id)
     if not doc:
@@ -91,11 +127,13 @@ def delete_document(document_id: int, db: Session = Depends(get_db), current_use
     return {"detail": "Документ удалён"}
 
 
+# ---- Отправка — только boss / admin ----
+
 @router.post("/send")
 def send_document(
     request: SendDocumentRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_boss_or_admin),
 ):
     handler = SendDocumentHandler(
         document_repository=DocumentRepository(db),
@@ -125,7 +163,7 @@ def send_document(
 def send_to_department(
     request: SendToDepartmentRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_boss_or_admin),
 ):
     handler = SendToDepartmentHandler(
         document_repository=DocumentRepository(db),
@@ -151,11 +189,13 @@ def send_to_department(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# ---- Пересылка — только employee / admin ----
+
 @router.post("/forward")
 def forward_document(
     request: ForwardDocumentRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_employee),
 ):
     handler = ForwardDocumentHandler(
         document_repository=DocumentRepository(db),
@@ -181,6 +221,8 @@ def forward_document(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+# ---- Ящики — доступны всем авторизованным ----
 
 @router.post("/inbox")
 def get_inbox(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
@@ -240,7 +282,6 @@ def get_pending(request: InboxRequest, db: Session = Depends(get_db), current_us
 
 @router.post("/read-list")
 def get_read_list(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    """Прочитанные документы (статус read) — ещё не подписанные."""
     repo = DocumentRepository(db)
     handler = GetReadInboxHandler(repo)
     items = handler.handle(request.user_id)
@@ -260,7 +301,6 @@ def get_read_list(request: InboxRequest, db: Session = Depends(get_db), current_
 
 @router.post("/signed-list")
 def get_signed_list(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    """Подписанные документы."""
     repo = DocumentRepository(db)
     handler = GetSignedInboxHandler(repo)
     items = handler.handle(request.user_id)
@@ -284,33 +324,6 @@ def mark_as_read(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Вызывается при открытии документа — меняет статус pending → read."""
     repo = DocumentRepository(db)
     handler = MarkAsReadHandler(repo)
     return handler.handle(document_id=document_id, user_id=current_user.id)
-
-
-@router.get("/unread-count/{user_id}")
-def get_unread_count(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    """Количество непрочитанных документов (pending) — для бейджа в меню."""
-    repo = DocumentRepository(db)
-    count = repo.get_unread_count(user_id)
-    return {"unread_count": count}
-
-
-@router.get("/status/{document_id}/{recipient_user_id}")
-def get_document_status(
-    document_id: int,
-    recipient_user_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    repo = DocumentRepository(db)
-    status = repo.get_document_status_for_user(document_id, recipient_user_id)
-    if not status:
-        raise HTTPException(status_code=404, detail="Статус не найден")
-    return status
