@@ -336,7 +336,7 @@
               <div v-if="pendingList.length" class="doc-list">
                 <div v-for="doc in pendingList" :key="doc.document_id" class="doc-row doc-row--pending">
                   <div class="doc-row__info">
-                    <span class="doc-title">{{ doc.title ?? 'Док. #' + doc.document_id }}</span>
+                    <span class="doc-title">{{ doc.title ?? 'Dok. #' + doc.document_id }}</span>
                     <span class="doc-id">ID: {{ doc.document_id }}</span>
                   </div>
                   <div class="doc-row__actions">
@@ -362,7 +362,7 @@
               <div v-for="doc in inboxList" :key="doc.document_id" class="doc-row"
                 :class="{ 'doc-row--new': !doc.status || doc.status==='new', 'doc-row--pending': doc.status==='pending', 'doc-row--signed': doc.status==='signed' }">
                 <div class="doc-row__info">
-                  <span class="doc-title">{{ doc.title ?? 'Док. #' + doc.document_id }}</span>
+                  <span class="doc-title">{{ doc.title ?? 'Dok. #' + doc.document_id }}</span>
                   <span class="doc-id">ID: {{ doc.document_id }} &middot; От польз. #{{ doc.sender_user_id }}</span>
                 </div>
                 <div class="doc-row__actions">
@@ -386,7 +386,7 @@
             <div v-if="pendingList.length" class="doc-list">
               <div v-for="doc in pendingList" :key="doc.document_id" class="doc-row doc-row--pending">
                 <div class="doc-row__info">
-                  <span class="doc-title">{{ doc.title ?? 'Док. #' + doc.document_id }}</span>
+                  <span class="doc-title">{{ doc.title ?? 'Dok. #' + doc.document_id }}</span>
                   <span class="doc-id">ID: {{ doc.document_id }}</span>
                 </div>
                 <div class="doc-row__actions">
@@ -410,7 +410,7 @@
             <div v-if="outboxList.length" class="doc-list">
               <div v-for="doc in outboxList" :key="doc.document_id" class="doc-row doc-row--signed">
                 <div class="doc-row__info">
-                  <span class="doc-title">{{ doc.title ?? 'Док. #' + doc.document_id }}</span>
+                  <span class="doc-title">{{ doc.title ?? 'Dok. #' + doc.document_id }}</span>
                   <span class="doc-id">ID: {{ doc.document_id }}</span>
                 </div>
                 <span class="doc-status doc-status--signed">✓ Подписан</span>
@@ -873,14 +873,16 @@ async function assignRole() {
 // ---- DOCUMENTS ----
 async function createDocument() {
   if (!documentForm.title.trim()) return showToast('Укажите заголовок', 'error')
-  if (!documentForm.organization_id) return showToast('Выберите организацию', 'error')
-  if (!documentForm.department_id) return showToast('Выберите отдел', 'error')
+  const orgId = parseInt(documentForm.organization_id, 10)
+  if (!orgId || orgId <= 0) return showToast('Выберите организацию', 'error')
+  const deptId = parseInt(documentForm.department_id, 10)
+  if (!deptId || deptId <= 0) return showToast('Выберите отдел', 'error')
   try {
     const data = await apiRequest('/documents/create', 'POST', {
       title: documentForm.title,
-      content: documentForm.content,
-      organization_id: Number(documentForm.organization_id),
-      department_id: Number(documentForm.department_id)
+      content: documentForm.content || '',
+      organization_id: orgId,
+      department_id: deptId
     })
     if (data?.id) {
       lastIds.document_id = data.id
@@ -899,10 +901,10 @@ async function sendDocument() {
   if (!sendForm.recipient_user_id) return showToast('Выберите получателя', 'error')
   try {
     await apiRequest('/documents/send', 'POST', {
-      document_id: Number(sendForm.document_id),
-      organization_id: Number(sendForm.organization_id),
-      department_id: Number(sendForm.department_id),
-      recipient_user_id: Number(sendForm.recipient_user_id)
+      document_id: parseInt(sendForm.document_id, 10),
+      organization_id: parseInt(sendForm.organization_id, 10),
+      department_id: parseInt(sendForm.department_id, 10) || null,
+      recipient_user_id: parseInt(sendForm.recipient_user_id, 10)
     })
     showToast('Документ отправлен!')
   } catch(e) { showToast(e.message, 'error') }
