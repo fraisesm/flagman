@@ -41,6 +41,29 @@ class DocumentRepository:
         self.db.refresh(recipient)
         return recipient
 
+    def get_existing_recipient(self, document_id: int, recipient_user_id: int):
+        """Check if a recipient record already exists for this document+user pair."""
+        return (
+            self.db.query(DocumentRecipientModel)
+            .filter(
+                DocumentRecipientModel.document_id == document_id,
+                DocumentRecipientModel.recipient_user_id == recipient_user_id,
+            )
+            .first()
+        )
+
+    def send_to_recipient(self, document_id: int, recipient_user_id: int):
+        """Create a new recipient record with status 'pending'."""
+        recipient = DocumentRecipientModel(
+            document_id=document_id,
+            recipient_user_id=recipient_user_id,
+            status="pending",
+        )
+        self.db.add(recipient)
+        self.db.commit()
+        self.db.refresh(recipient)
+        return recipient
+
     def get_inbox(self, user_id: int):
         return (
             self.db.query(DocumentRecipientModel, DocumentModel)
