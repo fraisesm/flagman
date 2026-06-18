@@ -30,7 +30,7 @@
               </label>
             </details>
             <button class="btn btn--primary btn--full" @click="login" :disabled="authLoading">
-              <svg v-if="authLoading" class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <svg v-if="authLoading" class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
               {{ authLoading ? 'Входим...' : 'Войти' }}
             </button>
             <p class="auth-switch">Нет аккаунта? <button class="link-btn" @click="authMode = 'register'">Зарегистрироваться</button></p>
@@ -302,7 +302,7 @@
                       </span>
                     </label>
                     <label class="field-label">Организация
-                      <select v-model="sendForm.organization_id" class="input" @change="loadDepartmentsByOrg(sendForm.organization_id); loadUsersByOrg(sendForm.organization_id)">
+                      <select v-model="sendForm.organization_id" class="input" @change="onSendOrgChange">
                         <option :value="null" disabled>— выберите —</option>
                         <option v-for="o in organizations" :key="o.id" :value="o.id">{{ o.name }}</option>
                       </select>
@@ -318,7 +318,8 @@
                         <option :value="null" disabled>— выберите —</option>
                         <option v-for="u in orgUsers" :key="u.id" :value="u.id">{{ u.full_name }} ({{ u.email }})</option>
                       </select>
-                      <span v-if="!orgUsers.length && sendForm.organization_id" class="hint-warn">⚠ Выберите организацию для загрузки сотрудников</span>
+                      <span v-if="usersLoading" class="hint">⏳ Загружаем сотрудников...</span>
+                      <span v-else-if="sendForm.organization_id && !orgUsers.length" class="hint-warn">⚠ Нет сотрудников в этой организации</span>
                     </label>
                     <button class="btn btn--ghost btn--sm" @click="fillSendIds">Подставить ID из последнего</button>
                     <button class="btn btn--primary" @click="sendDocument">Отправить</button>
@@ -467,7 +468,7 @@
                     </span>
                   </label>
                   <label class="field-label">Организация
-                    <select v-model="sendForm.organization_id" class="input" @change="loadDepartmentsByOrg(sendForm.organization_id); loadUsersByOrg(sendForm.organization_id)">
+                    <select v-model="sendForm.organization_id" class="input" @change="onSendOrgChange">
                       <option :value="null" disabled>— выберите —</option>
                       <option v-for="o in organizations" :key="o.id" :value="o.id">{{ o.name }}</option>
                     </select>
@@ -483,6 +484,8 @@
                       <option :value="null" disabled>— выберите —</option>
                       <option v-for="u in orgUsers" :key="u.id" :value="u.id">{{ u.full_name }} ({{ u.email }})</option>
                     </select>
+                    <span v-if="usersLoading" class="hint">⏳ Загружаем сотрудников...</span>
+                    <span v-else-if="sendForm.organization_id && !orgUsers.length" class="hint-warn">⚠ Нет сотрудников в этой организации</span>
                   </label>
                   <button class="btn btn--ghost btn--sm" @click="fillSendIds">Подставить ID</button>
                   <button class="btn btn--primary" @click="sendDocument">Отправить</button>
@@ -612,6 +615,7 @@ const outboxList  = ref([])
 const pendingList = ref([])
 const allUsers    = ref([])
 const orgUsers    = ref([])
+const usersLoading = ref(false)
 const organizations = ref([])
 const departments   = ref([])
 const statusResult  = ref(null)
@@ -706,10 +710,20 @@ function fillSendIds() {
   sendForm.document_id     = lastIds.document_id
   sendForm.organization_id = lastIds.organization_id
   sendForm.department_id   = lastIds.department_id
+  if (lastIds.organization_id) {
+    onSendOrgChange()
+  }
 }
 
 function setSenderRole() { roleForm.role_name = 'sender'; roleForm.can_send_document = true;  roleForm.can_sign_document = false; roleForm.can_manage_department = false }
 function setSignerRole()  { roleForm.role_name = 'signer'; roleForm.can_send_document = false; roleForm.can_sign_document = true;  roleForm.can_manage_department = false }
+
+// Вызывается при смене организации в форме отправки
+async function onSendOrgChange() {
+  const orgId = sendForm.organization_id
+  loadDepartmentsByOrg(orgId)
+  await loadUsersByOrg(orgId)
+}
 
 // ---- API ----
 async function apiRequest(path, method = 'GET', body = null) {
@@ -752,7 +766,6 @@ async function login() {
     lastIds.user_id   = data.user_id
     activeTab.value   = 'home'
     loadInbox(); loadPending(); loadOutbox()
-    // Загружаем организации для всех ролей, кому нужны формы
     loadOrganizations()
     if (userRole.value === 'admin') { loadAllUsers() }
   } catch(e) { authError.value = e.message } finally { authLoading.value = false }
@@ -763,13 +776,13 @@ async function loadOrganizations() {
   try {
     const d = await apiRequest('/organizations/')
     organizations.value = Array.isArray(d) ? d : []
-    // Если одна организация — автовыбираем её
     if (organizations.value.length === 1) {
       const orgId = organizations.value[0].id
       documentForm.organization_id = orgId
       sendForm.organization_id = orgId
       lastIds.organization_id = orgId
       loadDepartmentsByOrg(orgId)
+      loadUsersByOrg(orgId)
     }
   } catch(e) { showToast(e.message, 'error') }
 }
@@ -805,7 +818,6 @@ async function loadDepartmentsByOrg(orgId) {
   try {
     const d = await apiRequest(`/departments/by-organization/${orgId}`)
     departments.value = Array.isArray(d) ? d : []
-    // Если один отдел — автовыбираем
     if (departments.value.length === 1) {
       const deptId = departments.value[0].id
       documentForm.department_id = deptId
@@ -834,23 +846,33 @@ async function createDepartment() {
 }
 
 // ---- USERS BY ORG (для выбора получателя) ----
+// Всегда делаем запрос к API — не полагаемся на кэш allUsers,
+// так как у boss нет доступа к /auth/users и allUsers у него пустой.
 async function loadUsersByOrg(orgId) {
   if (!orgId) return
+  orgUsers.value = []
+  usersLoading.value = true
   try {
-    // Используем всех пользователей системы, если доступны, иначе пустой список
-    // Для boss — загружаем через /auth/users если разрешено, или показываем список allUsers
-    if (allUsers.value.length) {
-      orgUsers.value = allUsers.value
-    } else {
+    // Пробуем публичный эндпоинт сотрудников организации
+    // Если бэкенд его поддерживает — используем его, иначе fallback на /auth/users
+    let users = []
+    try {
+      const d = await apiRequest(`/employees/by-organization/${orgId}`)
+      users = Array.isArray(d) ? d : []
+    } catch {
+      // fallback: список всех пользователей (только для admin)
       try {
         const d = await apiRequest('/auth/users')
-        allUsers.value = Array.isArray(d) ? d : []
-        orgUsers.value = allUsers.value
+        users = Array.isArray(d) ? d : []
+        if (isAdmin.value) allUsers.value = users
       } catch {
-        orgUsers.value = []
+        users = []
       }
     }
-  } catch(e) { orgUsers.value = [] }
+    orgUsers.value = users
+  } finally {
+    usersLoading.value = false
+  }
 }
 
 // ---- EMPLOYEES ----
@@ -887,7 +909,6 @@ async function createDocument() {
     if (data?.id) {
       lastIds.document_id = data.id
       sendForm.document_id = data.id
-      // Добавляем в список созданных документов для выпадашки отправки
       sentDocuments.value.push({ id: data.id, title: documentForm.title })
     }
     showToast('Документ создан!')
