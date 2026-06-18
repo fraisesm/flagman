@@ -881,6 +881,10 @@ async function inviteEmployee() {
 
 // ---- ACCESS/ROLES ----
 async function assignRole() {
+  if (!roleForm.user_id) return showToast('Выберите пользователя', 'error')
+  if (!roleForm.organization_id) return showToast('Выберите организацию', 'error')
+  if (!roleForm.department_id) return showToast('Выберите отдел', 'error')
+  if (!roleForm.role_name.trim()) return showToast('Укажите название роли', 'error')
   try {
     await apiRequest('/access/assign-role', 'POST', roleForm)
     showToast('Роль выдана!')
