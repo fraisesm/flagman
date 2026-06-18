@@ -3,6 +3,8 @@ from data.repositories.access_repository import AccessRepository
 from data.repositories.document_repository import DocumentRepository
 from data.repositories.employee_repository import EmployeeRepository
 
+BOSS_ROLES = {"boss", "admin", "manager", "director"}
+
 
 class SendToDepartmentHandler:
     def __init__(
@@ -15,17 +17,30 @@ class SendToDepartmentHandler:
         self.access_repository = access_repository
         self.employee_repository = employee_repository
 
-    def handle(self, command: SendToDepartmentCommand):
-        # Проверяем право отправителя
+    def _sender_can_send(self, command: SendToDepartmentCommand) -> bool:
+        # 1. Проверяем DepartmentRoleModel
         sender_role = self.access_repository.get_user_role_in_department(
             command.sender_user_id,
             command.organization_id,
             command.department_id,
         )
-        if not sender_role or not sender_role.can_send_document:
+        if sender_role and sender_role.can_send_document is True:
+            return True
+
+        # 2. Fallback: проверяем роль в EmployeeMembership
+        membership = self.employee_repository.get_by_user_and_organization(
+            command.sender_user_id,
+            command.organization_id,
+        )
+        if membership and membership.role in BOSS_ROLES:
+            return True
+
+        return False
+
+    def handle(self, command: SendToDepartmentCommand):
+        if not self._sender_can_send(command):
             raise ValueError("У отправителя нет права отправлять документы")
 
-        # Получаем всех сотрудников отдела
         members = self.employee_repository.get_by_department(
             command.organization_id, command.department_id
         )
@@ -34,10 +49,8 @@ class SendToDepartmentHandler:
 
         results = []
         for member in members:
-            # Пропускаем самого отправителя
             if member.user_id == command.sender_user_id:
                 continue
-            # Пропускаем если уже отправлен
             existing = self.document_repository.get_existing_recipient(
                 command.document_id, member.user_id
             )

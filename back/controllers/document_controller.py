@@ -94,9 +94,11 @@ def send_document(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    document_repository = DocumentRepository(db)
-    access_repository = AccessRepository(db)
-    handler = SendDocumentHandler(document_repository, access_repository)
+    handler = SendDocumentHandler(
+        document_repository=DocumentRepository(db),
+        access_repository=AccessRepository(db),
+        employee_repository=EmployeeRepository(db),
+    )
     command = SendDocumentCommand(
         document_id=request.document_id,
         sender_user_id=current_user.id,
@@ -122,7 +124,6 @@ def send_to_department(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Рассылка документа всем сотрудникам отдела"""
     handler = SendToDepartmentHandler(
         document_repository=DocumentRepository(db),
         access_repository=AccessRepository(db),
@@ -153,7 +154,6 @@ def forward_document(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Перенаправление входящего документа другому сотруднику"""
     handler = ForwardDocumentHandler(
         document_repository=DocumentRepository(db),
         access_repository=AccessRepository(db),

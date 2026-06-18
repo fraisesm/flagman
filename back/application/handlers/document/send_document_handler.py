@@ -1,6 +1,9 @@
 from application.commands.document.send_document import SendDocumentCommand
 from data.repositories.access_repository import AccessRepository
 from data.repositories.document_repository import DocumentRepository
+from data.repositories.employee_repository import EmployeeRepository
+
+BOSS_ROLES = {"boss", "admin", "manager", "director"}
 
 
 class SendDocumentHandler:
@@ -8,31 +11,44 @@ class SendDocumentHandler:
         self,
         document_repository: DocumentRepository,
         access_repository: AccessRepository,
+        employee_repository: EmployeeRepository = None,
     ):
         self.document_repository = document_repository
         self.access_repository = access_repository
+        self.employee_repository = employee_repository
 
-    def handle(self, command: SendDocumentCommand):
+    def _sender_can_send(self, command: SendDocumentCommand) -> bool:
+        # 1. Проверяем DepartmentRoleModel (явно выданные права)
         sender_role = self.access_repository.get_user_role_in_department(
             command.sender_user_id,
             command.organization_id,
             command.department_id,
         )
+        if sender_role and sender_role.can_send_document is True:
+            return True
 
-        if not sender_role:
-            raise ValueError("У отправителя нет роли в этом отделе")
+        # 2. Fallback: проверяем роль в EmployeeMembership (boss / admin)
+        if self.employee_repository:
+            membership = self.employee_repository.get_by_user_and_organization(
+                command.sender_user_id,
+                command.organization_id,
+            )
+            if membership and membership.role in BOSS_ROLES:
+                return True
 
-        if sender_role.can_send_document is not True:  # type: ignore
-            raise ValueError("У сотрудника нет права отправлять документы")
+        return False
+
+    def handle(self, command: SendDocumentCommand):
+        if not self._sender_can_send(command):
+            raise ValueError("У отправителя нет права отправлять документы")
 
         existing_recipient = self.document_repository.get_existing_recipient(
             command.document_id,
             command.recipient_user_id,
         )
-
         if existing_recipient:
             raise ValueError("Этот документ уже отправлен данному сотруднику")
-        
+
         return self.document_repository.send_to_recipient(
             document_id=command.document_id,
             recipient_user_id=command.recipient_user_id,
