@@ -13,6 +13,9 @@ from application.handlers.document.forward_document_handler import ForwardDocume
 from application.handlers.document.get_inbox_handler import GetInboxHandler
 from application.handlers.document.get_outbox_handler import GetOutboxHandler
 from application.handlers.document.get_pending_inbox_handler import GetPendingInboxHandler
+from application.handlers.document.get_read_inbox_handler import GetReadInboxHandler
+from application.handlers.document.get_signed_inbox_handler import GetSignedInboxHandler
+from application.handlers.document.mark_as_read_handler import MarkAsReadHandler
 from application.dependencies.auth import get_current_user
 from data.db import get_db
 from data.repositories.document_repository import DocumentRepository
@@ -233,6 +236,70 @@ def get_pending(request: InboxRequest, db: Session = Depends(get_db), current_us
         }
         for r, doc in items
     ]
+
+
+@router.post("/read-list")
+def get_read_list(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    """Прочитанные документы (статус read) — ещё не подписанные."""
+    repo = DocumentRepository(db)
+    handler = GetReadInboxHandler(repo)
+    items = handler.handle(request.user_id)
+    return [
+        {
+            "document_id": doc.id,
+            "title": doc.title,
+            "content": doc.content,
+            "sender_user_id": doc.sender_user_id,
+            "organization_id": doc.organization_id,
+            "department_id": doc.department_id,
+            "status": r.status,
+        }
+        for r, doc in items
+    ]
+
+
+@router.post("/signed-list")
+def get_signed_list(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    """Подписанные документы."""
+    repo = DocumentRepository(db)
+    handler = GetSignedInboxHandler(repo)
+    items = handler.handle(request.user_id)
+    return [
+        {
+            "document_id": doc.id,
+            "title": doc.title,
+            "content": doc.content,
+            "sender_user_id": doc.sender_user_id,
+            "organization_id": doc.organization_id,
+            "department_id": doc.department_id,
+            "status": r.status,
+        }
+        for r, doc in items
+    ]
+
+
+@router.post("/mark-read/{document_id}")
+def mark_as_read(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Вызывается при открытии документа — меняет статус pending → read."""
+    repo = DocumentRepository(db)
+    handler = MarkAsReadHandler(repo)
+    return handler.handle(document_id=document_id, user_id=current_user.id)
+
+
+@router.get("/unread-count/{user_id}")
+def get_unread_count(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Количество непрочитанных документов (pending) — для бейджа в меню."""
+    repo = DocumentRepository(db)
+    count = repo.get_unread_count(user_id)
+    return {"unread_count": count}
 
 
 @router.get("/status/{document_id}/{recipient_user_id}")
