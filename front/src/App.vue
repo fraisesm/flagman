@@ -6,7 +6,7 @@
       <div v-if="!token" class="auth-screen">
         <div class="auth-card">
           <div class="auth-logo">
-            <svg width="40" height="40" viewBox="0 0 44 44" fill="none" aria-label="Флагман">
+            <svg width="42" height="42" viewBox="0 0 44 44" fill="none" aria-label="Флагман">
               <rect width="44" height="44" rx="12" fill="#1a7fc4"/>
               <path d="M10 34V10h18l-6 8h-6v16H10z" fill="white"/>
               <path d="M22 10h12l-6 8H22l6-8z" fill="white" opacity="0.6"/>
@@ -18,15 +18,15 @@
           <!-- LOGIN -->
           <div v-if="authMode === 'login'" class="auth-form">
             <h2>Войти в аккаунт</h2>
-            <label>Email
+            <label class="field-label">Email
               <input v-model="loginForm.email" class="input" type="email" placeholder="you@company.ru" autocomplete="email" />
             </label>
-            <label>Пароль
+            <label class="field-label">Пароль
               <input v-model="loginForm.password" class="input" type="password" placeholder="••••••••" autocomplete="current-password" />
             </label>
             <details class="auth-backend">
               <summary>Настройки сервера</summary>
-              <label style="margin-top:10px">Backend URL
+              <label class="field-label" style="margin-top:10px">Backend URL
                 <input v-model="baseUrl" class="input input--sm" placeholder="http://127.0.0.1:8000" />
               </label>
             </details>
@@ -41,21 +41,21 @@
           <!-- REGISTER -->
           <div v-else class="auth-form">
             <h2>Регистрация</h2>
-            <label>ФИО
+            <label class="field-label">ФИО
               <input v-model="registerForm.full_name" class="input" placeholder="Иванов Иван Иванович" />
             </label>
-            <label>Email
+            <label class="field-label">Email
               <input v-model="registerForm.email" class="input" type="email" placeholder="you@company.ru" />
             </label>
-            <label>Телефон
+            <label class="field-label">Телефон
               <input v-model="registerForm.phone" class="input" type="tel" placeholder="+7 900 000 00 00" />
             </label>
-            <label>Пароль
+            <label class="field-label">Пароль
               <input v-model="registerForm.password" class="input" type="password" placeholder="••••••••" />
             </label>
             <details class="auth-backend">
               <summary>Настройки сервера</summary>
-              <label style="margin-top:10px">Backend URL
+              <label class="field-label" style="margin-top:10px">Backend URL
                 <input v-model="baseUrl" class="input input--sm" placeholder="http://127.0.0.1:8000" />
               </label>
             </details>
@@ -116,7 +116,7 @@
         </div>
       </header>
 
-      <!-- TOAST уведомление -->
+      <!-- TOAST -->
       <transition name="slide-down">
         <div v-if="toast.visible" class="toast" :class="'toast--' + toast.type" role="alert">
           {{ toast.message }}
@@ -160,7 +160,7 @@
               </div>
             </div>
 
-            <!-- ADMIN: управление структурой -->
+            <!-- ADMIN -->
             <template v-if="userRole === 'admin'">
               <div class="section-block">
                 <h2 class="section-title">Управление структурой</h2>
@@ -246,7 +246,7 @@
               </div>
             </template>
 
-            <!-- MANAGER: быстрая отправка -->
+            <!-- MANAGER -->
             <div v-if="userRole === 'manager'" class="section-block">
               <h2 class="section-title">Создать и отправить документ</h2>
               <div class="cards-grid">
@@ -295,11 +295,11 @@
               </div>
             </div>
 
-            <!-- EMPLOYEE: требуют подписи -->
+            <!-- EMPLOYEE -->
             <div v-if="userRole === 'employee'" class="section-block">
               <div class="section-title-row">
                 <h2 class="section-title">Требуют вашей подписи</h2>
-                <button class="btn btn--ghost btn--sm" @click="loadPending">Обновить</button>
+                <button class="btn btn--ghost btn--sm" @click="loadPending">↻ Обновить</button>
               </div>
               <div v-if="pendingList.length" class="doc-list">
                 <div v-for="doc in pendingList" :key="doc.document_id" class="doc-row doc-row--pending">
@@ -360,7 +360,7 @@
             </div>
           </section>
 
-          <!-- ======== ПРОЧИТАННЫЕ, НЕ ПОДПИСАННЫЕ ======== -->
+          <!-- ======== НЕ ПОДПИСАННЫЕ ======== -->
           <section v-else-if="activeTab === 'read_unsigned'" key="read_unsigned">
             <div class="page-header">
               <div>
@@ -499,12 +499,12 @@
             </div>
           </section>
 
-          <!-- ======== АДМИНИСТРАТОР: ИНФОРМАЦИЯ ======== -->
+          <!-- ======== АДМИНИСТРАТОР: МОНИТОРИНГ ======== -->
           <section v-else-if="activeTab === 'admin_info'" key="admin_info">
             <div class="page-header">
               <div>
-                <h1>Информация по системе</h1>
-                <p class="page-sub">Полный мониторинг документов и статусов</p>
+                <h1>Мониторинг системы</h1>
+                <p class="page-sub">Полный контроль документов и статусов</p>
               </div>
             </div>
             <div class="cards-grid">
@@ -553,22 +553,22 @@
 import { ref, reactive, computed } from 'vue'
 
 // ---- STATE ----
-const baseUrl      = ref('http://127.0.0.1:8000')
-const activeTab    = ref('home')
-const token        = ref(null)
-const currentUser  = ref(null)
-const authMode     = ref('login')
-const authLoading  = ref(false)
-const authError    = ref('')
-const theme        = ref('light')
-const userRole     = ref('employee')
-const output       = ref(null)
-const inboxList    = ref([])
-const outboxList   = ref([])
-const pendingList  = ref([])
-const statusResult = ref(null)
-const inboxUserId  = ref(null)
-const outboxUserId = ref(null)
+const baseUrl       = ref('http://127.0.0.1:8000')
+const activeTab     = ref('home')
+const token         = ref(null)
+const currentUser   = ref(null)
+const authMode      = ref('login')
+const authLoading   = ref(false)
+const authError     = ref('')
+const theme         = ref('light')
+const userRole      = ref('employee')
+const output        = ref(null)
+const inboxList     = ref([])
+const outboxList    = ref([])
+const pendingList   = ref([])
+const statusResult  = ref(null)
+const inboxUserId   = ref(null)
+const outboxUserId  = ref(null)
 const pendingUserId = ref(null)
 
 const toast = reactive({ visible: false, message: '', type: 'success' })
@@ -578,8 +578,8 @@ const lastIds = reactive({
   department_id: null, document_id: null, recipient_user_id: null
 })
 
-const registerForm = reactive({ full_name: '', email: '', phone: '', password: '' })
-const loginForm    = reactive({ email: '', password: '' })
+const registerForm     = reactive({ full_name: '', email: '', phone: '', password: '' })
+const loginForm        = reactive({ email: '', password: '' })
 const organizationForm = reactive({ name: '' })
 const departmentForm   = reactive({ organization_id: null, name: '' })
 const inviteForm       = reactive({ user_id: null, organization_id: null })
@@ -610,10 +610,10 @@ const newCount = computed(() => inboxList.value.filter(d => d.status === 'new' |
 
 const visibleTabs = computed(() => {
   const common = [
-    { key: 'home',         label: 'Главная' },
-    { key: 'inbox',        label: 'Полученные письма', badge: true },
+    { key: 'home',          label: 'Главная' },
+    { key: 'inbox',         label: 'Полученные письма', badge: true },
     { key: 'read_unsigned', label: 'Не подписанные' },
-    { key: 'signed',       label: 'Подписанные' },
+    { key: 'signed',        label: 'Подписанные' },
   ]
   if (userRole.value === 'manager')  return [...common, { key: 'send',       label: 'Отправить документ' }]
   if (userRole.value === 'employee') return [...common, { key: 'sign',       label: 'Подписать' }]
@@ -639,16 +639,16 @@ function logout()      { token.value = null; currentUser.value = null; authMode.
 
 function showToast(message, type = 'success') {
   toast.message = message
-  toast.type = type
+  toast.type    = type
   toast.visible = true
   setTimeout(() => { toast.visible = false }, 3500)
 }
 
 function switchTab(key) {
   activeTab.value = key
-  if (key === 'inbox')        loadInbox()
+  if (key === 'inbox')         loadInbox()
   if (key === 'read_unsigned') loadPending()
-  if (key === 'signed')       loadOutbox()
+  if (key === 'signed')        loadOutbox()
 }
 
 function normalizeError(data) {
@@ -764,24 +764,25 @@ async function signDocument() {
 
 async function quickSign(docId) { signForm.document_id = docId; await signDocument() }
 
+// ---- FIX: inbox/outbox/pending используют POST с body { user_id } ----
 async function loadInbox() {
   const uid = inboxUserId.value ?? lastIds.user_id
   if (!uid) return
-  try { const d = await apiRequest(`/documents/inbox/${uid}`); inboxList.value = Array.isArray(d) ? d : [] }
+  try { const d = await apiRequest('/documents/inbox', 'POST', { user_id: uid }); inboxList.value = Array.isArray(d) ? d : [] }
   catch { inboxList.value = [] }
 }
 
 async function loadOutbox() {
   const uid = outboxUserId.value ?? lastIds.user_id
   if (!uid) return
-  try { const d = await apiRequest(`/documents/outbox/${uid}`); outboxList.value = Array.isArray(d) ? d : [] }
+  try { const d = await apiRequest('/documents/outbox', 'POST', { user_id: uid }); outboxList.value = Array.isArray(d) ? d : [] }
   catch { outboxList.value = [] }
 }
 
 async function loadPending() {
   const uid = pendingUserId.value ?? lastIds.user_id
   if (!uid) return
-  try { const d = await apiRequest(`/documents/pending/${uid}`); pendingList.value = Array.isArray(d) ? d : [] }
+  try { const d = await apiRequest('/documents/pending', 'POST', { user_id: uid }); pendingList.value = Array.isArray(d) ? d : [] }
   catch { pendingList.value = [] }
 }
 
@@ -792,7 +793,6 @@ async function loadStatus() {
 </script>
 
 <style scoped>
-/* Field label */
 .field-label {
   display: flex;
   flex-direction: column;
@@ -804,7 +804,6 @@ async function loadStatus() {
   color: var(--text-muted);
 }
 
-/* Section title row */
 .section-title-row {
   display: flex;
   align-items: center;
@@ -813,14 +812,12 @@ async function loadStatus() {
 }
 .section-title-row .section-title { margin-bottom: 0; }
 
-/* KPI sub */
 .kpi-sub {
   font-size: 11px;
   color: var(--text-faint);
   margin-top: 2px;
 }
 
-/* Toast */
 .toast {
   position: fixed;
   top: calc(var(--header-h) + 12px);
@@ -859,13 +856,9 @@ async function loadStatus() {
 }
 .toast__close:hover { opacity: 1; }
 
-/* Spinner */
-.spinner {
-  animation: spin 0.8s linear infinite;
-}
+.spinner { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Transitions */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
