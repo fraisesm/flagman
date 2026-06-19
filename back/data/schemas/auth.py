@@ -33,14 +33,12 @@ class RegisterRequest(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Телефон не может быть пустым")
-        # Убираем пробелы и дефисы если есть (например +7 989 123-45-67)
         cleaned = re.sub(r'[\s\-()]', '', v)
         if not PHONE_REGEX.match(cleaned):
             raise ValueError(
                 "Неверный формат номера телефона. "
                 "Используйте формат +79891234567, 79891234567 или 89891234567"
             )
-        # Приводим к единому формату +7XXXXXXXXXX
         if cleaned.startswith('8'):
             cleaned = '+7' + cleaned[1:]
         elif cleaned.startswith('7'):
@@ -50,6 +48,7 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     message: str
+    id: Optional[int] = None  # user id — needed by front-end to set lastIds.user_id
 
 
 class LoginRequest(BaseModel):

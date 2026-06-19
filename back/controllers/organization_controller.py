@@ -28,12 +28,35 @@ def create_organization(
     return handler.handle(command)
 
 
+# Alias used by the front-end: POST /organizations/create
+@router.post("/create", response_model=OrganizationResponse)
+def create_organization_alias(
+    request: CreateOrganizationRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = OrganizationRepository(db)
+    handler = CreateOrganizationHandler(repo)
+    command = CreateOrganizationCommand(name=request.name, owner_id=current_user.id)
+    return handler.handle(command)
+
+
 @router.get("/", response_model=List[OrganizationResponse])
 def list_organizations(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     repo = OrganizationRepository(db)
     handler = ListOrganizationsHandler(repo)
-    # Админ видит только свои организации (где он owner).
-    # Начальник и сотрудник видят все организации — чтобы выбрать свою.
+    if current_user.role == "admin":
+        query = ListOrganizationsQuery(owner_id=current_user.id, all_organizations=False)
+    else:
+        query = ListOrganizationsQuery(all_organizations=True)
+    return handler.handle(query)
+
+
+# Alias used by the front-end: GET /organizations/list
+@router.get("/list", response_model=List[OrganizationResponse])
+def list_organizations_alias(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    repo = OrganizationRepository(db)
+    handler = ListOrganizationsHandler(repo)
     if current_user.role == "admin":
         query = ListOrganizationsQuery(owner_id=current_user.id, all_organizations=False)
     else:

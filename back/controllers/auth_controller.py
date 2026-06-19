@@ -22,11 +22,12 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         email=request.email,
         phone=request.phone,
         password=request.password,
-        role=request.role, # type: ignore
+        role=request.role,  # type: ignore
     )
     try:
-        handler.handle(command)
-        return RegisterResponse(message="Пользователь успешно зарегистрирован")
+        user = handler.handle(command)
+        # Return id so the front-end can save lastIds.user_id immediately after registration
+        return RegisterResponse(message="Пользователь успешно зарегистрирован", id=user.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -81,6 +82,5 @@ def get_users_public(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Доступно всем авторизованным пользователям — для выбора получателя.
-    Возвращает только базовые поля: id, full_name, email, role."""
+    """Доступно всем авторизованным пользователям — для выбора получателя."""
     return UserRepository(db).get_all()

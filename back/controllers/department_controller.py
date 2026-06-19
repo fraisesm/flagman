@@ -32,8 +32,32 @@ def create_department(
     return handler.handle(command)
 
 
+# Alias used by the front-end: POST /departments/create
+@router.post("/create", response_model=DepartmentResponse)
+def create_department_alias(
+    request: CreateDepartmentRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = DepartmentRepository(db)
+    handler = CreateDepartmentHandler(repo)
+    command = CreateDepartmentCommand(
+        name=request.name,
+        organization_id=request.organization_id,
+        description=request.description,
+    )
+    return handler.handle(command)
+
+
 @router.get("/by-organization/{organization_id}", response_model=List[DepartmentResponse])
 def list_departments(organization_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    repo = DepartmentRepository(db)
+    return ListDepartmentsHandler(repo).handle(ListDepartmentsQuery(organization_id=organization_id))
+
+
+# Alias used by the front-end: GET /departments/list/{org_id}
+@router.get("/list/{organization_id}", response_model=List[DepartmentResponse])
+def list_departments_alias(organization_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     repo = DepartmentRepository(db)
     return ListDepartmentsHandler(repo).handle(ListDepartmentsQuery(organization_id=organization_id))
 
@@ -57,7 +81,7 @@ def update_department(
     repo = DepartmentRepository(db)
     try:
         return UpdateDepartmentHandler(repo).handle(
-            UpdateDepartmentCommand(department_id=department_id, name=request.name, description=request.description) # type: ignore
+            UpdateDepartmentCommand(department_id=department_id, name=request.name, description=request.description)  # type: ignore
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

@@ -99,6 +99,41 @@ def get_document_status(
     return status
 
 
+# ---- GET-алиасы для фронта (фронт использует GET /{user_id}) ----
+
+@router.get("/inbox/{user_id}")
+def get_inbox_by_path(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = DocumentRepository(db)
+    items = GetInboxHandler(repo).handle(user_id)
+    return [_doc_dict(doc, r.status) for r, doc in items]
+
+
+@router.get("/outbox/{user_id}")
+def get_outbox_by_path(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = DocumentRepository(db)
+    docs = GetOutboxHandler(repo).handle(user_id)
+    return [_doc_dict(doc) for doc in docs]
+
+
+@router.get("/pending/{user_id}")
+def get_pending_by_path(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = DocumentRepository(db)
+    items = GetPendingInboxHandler(repo).handle(user_id)
+    return [_doc_dict(doc, r.status) for r, doc in items]
+
+
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document(
     document_id: int,
@@ -199,52 +234,33 @@ def send_to_department(
         department_id=request.department_id,
     )
     try:
-        recipients = handler.handle(command)
-        return {
-            "sent_to": len(recipients),
-            "recipients": [
-                {"id": r.id, "recipient_user_id": r.recipient_user_id, "status": r.status}
-                for r in recipients
-            ],
-        }
+        return handler.handle(command)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
-# ---- Пересылка (employee / admin) ----
 
 @router.post("/forward")
 def forward_document(
     request: ForwardDocumentRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_employee),
+    current_user=Depends(require_boss_or_admin),
 ):
     handler = ForwardDocumentHandler(
         document_repository=DocumentRepository(db),
-        access_repository=AccessRepository(db),
         signature_repository=SignatureRepository(db),
     )
     command = ForwardDocumentCommand(
         document_id=request.document_id,
         sender_user_id=current_user.id,
-        organization_id=request.organization_id,
-        department_id=request.department_id,
         recipient_user_id=request.recipient_user_id,
     )
     try:
-        recipient = handler.handle(command)
-        return {
-            "id": recipient.id,
-            "document_id": recipient.document_id,
-            "recipient_user_id": recipient.recipient_user_id,
-            "status": recipient.status,
-            "forwarded_by": current_user.id,
-        }
+        return handler.handle(command)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ---- Ящики ----
+# ---- POST-версии (оставлены для совместимости) ----
 
 @router.post("/inbox")
 def get_inbox(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
