@@ -38,25 +38,20 @@ def list_employees(organization_id: int, db: Session = Depends(get_db), current_
     return repo.get_all_by_organization(organization_id)
 
 
-# Front-end uses GET /employees/list/{dept_id} to populate recipient dropdown
 @router.get("/list/{department_id}", response_model=List[EmployeeResponse])
 def list_employees_by_department(
     department_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Returns all employees of a specific department (used by boss to pick a recipient)."""
     repo = EmployeeRepository(db)
-    # get_by_department requires org_id too; fall back to filtering all by dept only
     from data.models.employee_membership_model import EmployeeMembershipModel
-    from data.models.user_model import UserModel
     results = (
         db.query(EmployeeMembershipModel)
         .filter(EmployeeMembershipModel.department_id == department_id)
         .all()
     )
-    enriched = [repo._enrich(m) for m in results]
-    return enriched
+    return [repo._enrich(m) for m in results]
 
 
 @router.get("/{membership_id}", response_model=EmployeeResponse)
