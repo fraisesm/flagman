@@ -53,6 +53,13 @@
             <label>Пароль
               <input v-model="registerForm.password" class="input" type="password" placeholder="••••••••" />
             </label>
+            <label>Роль
+              <select v-model="registerForm.role" class="input">
+                <option value="employee">Сотрудник</option>
+                <option value="manager">Начальник</option>
+                <option value="admin">Администратор</option>
+              </select>
+            </label>
             <details class="auth-backend">
               <summary>Настройки сервера</summary>
               <label style="margin-top:10px">Backend URL
@@ -99,13 +106,10 @@
         </nav>
 
         <div class="header__right">
-          <div class="role-pill" title="Роль в системе">
+          <!-- Роль — только читаемый текст, без возможности менять -->
+          <div class="role-pill" title="Ваша роль в системе">
             <span class="role-icon" aria-hidden="true">{{ roleIcon }}</span>
-            <select v-model="userRole" class="role-select" aria-label="Выбор роли">
-              <option value="admin">Администратор</option>
-              <option value="manager">Начальник</option>
-              <option value="employee">Сотрудник</option>
-            </select>
+            <span class="role-label">{{ roleLabel }}</span>
           </div>
           <span class="user-name">{{ currentUser?.full_name ?? currentUser?.email ?? 'Пользователь' }}</span>
           <button class="btn btn--ghost btn--sm" @click="logout">Выйти</button>
@@ -500,7 +504,7 @@ const authMode     = ref('login')
 const authLoading  = ref(false)
 const authError    = ref('')
 const theme        = ref('light')
-const userRole     = ref('employee')
+const userRole     = ref(null)   // берётся только с бэкенда через /auth/me
 const output       = ref(null)
 const inboxList    = ref([])
 const outboxList   = ref([])
@@ -520,7 +524,7 @@ const lastIds = reactive({
   department_id: null, document_id: null, recipient_user_id: null
 })
 
-const registerForm = reactive({ full_name: '', email: '', phone: '', password: '' })
+const registerForm = reactive({ full_name: '', email: '', phone: '', password: '', role: 'employee' })
 const loginForm    = reactive({ email: '', password: '' })
 const organizationForm = reactive({ name: '' })
 const departmentForm   = reactive({ organization_id: null, name: '' })
@@ -536,6 +540,8 @@ const statusForm   = reactive({ document_id: null, recipient_user_id: null })
 
 // ---- COMPUTED ----
 const roleIcon = computed(() => ({ admin: '🛡️', manager: '👔', employee: '👤' }[userRole.value] || '👤'))
+
+const roleLabel = computed(() => ({ admin: 'Администратор', manager: 'Начальник', employee: 'Сотрудник' }[userRole.value] || userRole.value || ''))
 
 const firstName = computed(() => {
   const name = currentUser.value?.full_name ?? ''
@@ -577,7 +583,7 @@ function docStatusLabel(status) {
 function toggleTheme() { theme.value = theme.value === 'light' ? 'dark' : 'light' }
 function pretty(v)     { return (v == null) ? 'Нет данных' : JSON.stringify(v, null, 2) }
 function clearOutput() { output.value = null }
-function logout()      { token.value = null; currentUser.value = null; authMode.value = 'login'; authError.value = '' }
+function logout()      { token.value = null; currentUser.value = null; userRole.value = null; authMode.value = 'login'; authError.value = '' }
 
 function showToast(message, type = 'success') {
   toast.message = message
@@ -649,7 +655,10 @@ async function login() {
     if (data?.access_token) {
       token.value = data.access_token
       const me = await apiRequest('/auth/me', 'GET')
-      currentUser.value = me; lastIds.user_id = me.id
+      currentUser.value = me
+      // Роль берётся исключительно с бэкенда — пользователь не может её менять
+      userRole.value = me.role
+      lastIds.user_id = me.id
       inboxUserId.value = me.id; outboxUserId.value = me.id; pendingUserId.value = me.id
       activeTab.value = 'home'
       loadInbox(); loadPending(); loadOutbox()
@@ -759,6 +768,12 @@ async function loadStatus() {
 </script>
 
 <style scoped>
+.role-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .field-label {
   display: flex;
   flex-direction: column;
