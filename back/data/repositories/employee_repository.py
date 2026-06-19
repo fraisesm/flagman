@@ -9,17 +9,19 @@ class EmployeeRepository:
         self.db = db
 
     def _enrich(self, membership):
-        """Attach full_name and email from the related User to a membership object."""
+        """Return a plain dict with user fields merged in so Pydantic can serialise them."""
         if membership is None:
             return None
         user = self.db.query(UserModel).filter(UserModel.id == membership.user_id).first()
-        if user:
-            membership.full_name = user.full_name
-            membership.email = user.email
-        else:
-            membership.full_name = None
-            membership.email = None
-        return membership
+        return {
+            "id":              membership.id,
+            "user_id":         membership.user_id,
+            "organization_id": membership.organization_id,
+            "department_id":   membership.department_id,
+            "role":            membership.role,
+            "full_name":       user.full_name if user else None,
+            "email":           user.email     if user else None,
+        }
 
     def create_membership(self, membership: EmployeeMembership):
         model = EmployeeMembershipModel(
@@ -68,7 +70,7 @@ class EmployeeRepository:
         return [self._enrich(m) for m in results]
 
     def update_role(self, membership_id: int, role: str, department_id: int):
-        model = self.get_by_id(membership_id)
+        model = self.db.query(EmployeeMembershipModel).filter(EmployeeMembershipModel.id == membership_id).first()
         if model:
             model.role = role
             model.department_id = department_id
@@ -77,7 +79,7 @@ class EmployeeRepository:
         return self._enrich(model)
 
     def delete(self, membership_id: int):
-        model = self.get_by_id(membership_id)
+        model = self.db.query(EmployeeMembershipModel).filter(EmployeeMembershipModel.id == membership_id).first()
         if model:
             self.db.delete(model)
             self.db.commit()
