@@ -1,17 +1,19 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, HttpUrl
+from typing import Optional
 
 
 class CreateDocumentRequest(BaseModel):
     title: str
-    content: str
+    content: Optional[str] = None
+    link: Optional[str] = None          # optional URL
     organization_id: int
     department_id: Optional[int] = None
 
 
 class UpdateDocumentRequest(BaseModel):
     title: str
-    content: str
+    content: Optional[str] = None
+    link: Optional[str] = None
 
 
 class SendDocumentRequest(BaseModel):
@@ -45,7 +47,8 @@ class OutboxRequest(BaseModel):
 class DocumentResponse(BaseModel):
     id: int
     title: str
-    content: str
+    content: Optional[str] = None
+    link: Optional[str] = None
     sender_user_id: int
     organization_id: int
     department_id: Optional[int] = None

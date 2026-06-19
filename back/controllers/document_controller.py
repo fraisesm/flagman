@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
 
 from application.commands.document.create_document import CreateDocumentCommand
 from application.commands.document.send_document import SendDocumentCommand
@@ -37,7 +36,22 @@ from data.schemas.document import (
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
-# ---- Создание / редактирование — только boss / admin ----
+def _doc_dict(doc, status=None):
+    d = {
+        "document_id": doc.id,
+        "title": doc.title,
+        "content": doc.content,
+        "link": doc.link,
+        "sender_user_id": doc.sender_user_id,
+        "organization_id": doc.organization_id,
+        "department_id": doc.department_id,
+    }
+    if status is not None:
+        d["status"] = status
+    return d
+
+
+# ---- Создание (boss / admin) ----
 
 @router.post("/create", response_model=DocumentResponse)
 def create_document(
@@ -49,12 +63,16 @@ def create_document(
     handler = CreateDocumentHandler(repo)
     command = CreateDocumentCommand(
         title=request.title,
-        content=request.content,
+        content=request.content or "",
+        link=request.link,
         sender_user_id=current_user.id,
         organization_id=request.organization_id,
         department_id=request.department_id,
     )
-    return handler.handle(command)
+    try:
+        return handler.handle(command)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/unread-count/{user_id}")
@@ -64,8 +82,7 @@ def get_unread_count(
     current_user=Depends(get_current_user),
 ):
     repo = DocumentRepository(db)
-    count = repo.get_unread_count(user_id)
-    return {"unread_count": count}
+    return {"unread_count": repo.get_unread_count(user_id)}
 
 
 @router.get("/status/{document_id}/{recipient_user_id}")
@@ -108,7 +125,12 @@ def update_document(
         raise HTTPException(status_code=404, detail="Документ не найден")
     if doc.sender_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Нет доступа")
-    return repo.update(document_id, request.title, request.content)
+    doc.title = request.title
+    doc.content = request.content
+    doc.link = request.link
+    db.commit()
+    db.refresh(doc)
+    return doc
 
 
 @router.delete("/{document_id}")
@@ -127,7 +149,7 @@ def delete_document(
     return {"detail": "Документ удалён"}
 
 
-# ---- Отправка — только boss / admin ----
+# ---- Отправка (boss / admin) ----
 
 @router.post("/send")
 def send_document(
@@ -189,7 +211,7 @@ def send_to_department(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ---- Пересылка — только employee / admin ----
+# ---- Пересылка (employee / admin) ----
 
 @router.post("/forward")
 def forward_document(
@@ -222,100 +244,41 @@ def forward_document(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ---- Ящики — доступны всем авторизованным ----
+# ---- Ящики ----
 
 @router.post("/inbox")
 def get_inbox(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     repo = DocumentRepository(db)
-    handler = GetInboxHandler(repo)
-    items = handler.handle(request.user_id)
-    return [
-        {
-            "document_id": doc.id,
-            "title": doc.title,
-            "content": doc.content,
-            "sender_user_id": doc.sender_user_id,
-            "organization_id": doc.organization_id,
-            "department_id": doc.department_id,
-            "status": r.status,
-        }
-        for r, doc in items
-    ]
+    items = GetInboxHandler(repo).handle(request.user_id)
+    return [_doc_dict(doc, r.status) for r, doc in items]
 
 
 @router.post("/outbox")
 def get_outbox(request: OutboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     repo = DocumentRepository(db)
-    handler = GetOutboxHandler(repo)
-    documents = handler.handle(request.user_id)
-    return [
-        {
-            "document_id": doc.id,
-            "title": doc.title,
-            "content": doc.content,
-            "sender_user_id": doc.sender_user_id,
-            "organization_id": doc.organization_id,
-            "department_id": doc.department_id,
-        }
-        for doc in documents
-    ]
+    docs = GetOutboxHandler(repo).handle(request.user_id)
+    return [_doc_dict(doc) for doc in docs]
 
 
 @router.post("/pending")
 def get_pending(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     repo = DocumentRepository(db)
-    handler = GetPendingInboxHandler(repo)
-    items = handler.handle(request.user_id)
-    return [
-        {
-            "document_id": doc.id,
-            "title": doc.title,
-            "content": doc.content,
-            "sender_user_id": doc.sender_user_id,
-            "organization_id": doc.organization_id,
-            "department_id": doc.department_id,
-            "status": r.status,
-        }
-        for r, doc in items
-    ]
+    items = GetPendingInboxHandler(repo).handle(request.user_id)
+    return [_doc_dict(doc, r.status) for r, doc in items]
 
 
 @router.post("/read-list")
 def get_read_list(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     repo = DocumentRepository(db)
-    handler = GetReadInboxHandler(repo)
-    items = handler.handle(request.user_id)
-    return [
-        {
-            "document_id": doc.id,
-            "title": doc.title,
-            "content": doc.content,
-            "sender_user_id": doc.sender_user_id,
-            "organization_id": doc.organization_id,
-            "department_id": doc.department_id,
-            "status": r.status,
-        }
-        for r, doc in items
-    ]
+    items = GetReadInboxHandler(repo).handle(request.user_id)
+    return [_doc_dict(doc, r.status) for r, doc in items]
 
 
 @router.post("/signed-list")
 def get_signed_list(request: InboxRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     repo = DocumentRepository(db)
-    handler = GetSignedInboxHandler(repo)
-    items = handler.handle(request.user_id)
-    return [
-        {
-            "document_id": doc.id,
-            "title": doc.title,
-            "content": doc.content,
-            "sender_user_id": doc.sender_user_id,
-            "organization_id": doc.organization_id,
-            "department_id": doc.department_id,
-            "status": r.status,
-        }
-        for r, doc in items
-    ]
+    items = GetSignedInboxHandler(repo).handle(request.user_id)
+    return [_doc_dict(doc, r.status) for r, doc in items]
 
 
 @router.post("/mark-read/{document_id}")
@@ -325,5 +288,4 @@ def mark_as_read(
     current_user=Depends(get_current_user),
 ):
     repo = DocumentRepository(db)
-    handler = MarkAsReadHandler(repo)
-    return handler.handle(document_id=document_id, user_id=current_user.id)
+    return MarkAsReadHandler(repo).handle(document_id=document_id, user_id=current_user.id)
