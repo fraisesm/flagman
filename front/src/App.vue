@@ -259,27 +259,23 @@
               </div>
             </template>
 
-            <!-- BOSS HOME — единая форма -->
+            <!-- BOSS HOME — единая форма создания и отправки -->
             <div v-if="isBoss" class="section-block">
-              <h2 class="section-title">Создать и отправить документ</h2>
+              <h2 class="section-title">Новый документ</h2>
               <div class="card card--wide">
                 <div class="form-col">
-                  <!-- Строка 1: заголовок -->
                   <label class="field-label">Заголовок
                     <input v-model="documentForm.title" class="input" placeholder="Приказ №12" />
                   </label>
 
-                  <!-- Строка 2: содержимое -->
                   <label class="field-label">Содержимое
                     <textarea v-model="documentForm.content" class="input textarea" placeholder="Текст документа..." rows="3"></textarea>
                   </label>
 
-                  <!-- Строка 3: ссылка -->
                   <label class="field-label">Ссылка <span class="field-optional">(необязательно)</span>
                     <input v-model="documentForm.link" class="input" type="url" placeholder="https://example.com/doc.pdf" />
                   </label>
 
-                  <!-- Строка 4: орг + отдел -->
                   <div class="form-row">
                     <label class="field-label" style="flex:1">Организация
                       <select v-model="documentForm.organization_id" class="input" @change="onDocOrgChange">
@@ -296,7 +292,6 @@
                     </label>
                   </div>
 
-                  <!-- Строка 5: получатель -->
                   <label class="field-label">Получатель
                     <select v-model="sendForm.recipient_user_id" class="input">
                       <option :value="null" disabled>— выберите —</option>
@@ -306,7 +301,6 @@
                     <span v-else-if="documentForm.organization_id && !orgUsers.length" class="hint-warn">⚠ Нет сотрудников в этой организации</span>
                   </label>
 
-                  <!-- Кнопка -->
                   <button
                     class="btn btn--primary"
                     @click="createAndSend"
@@ -416,58 +410,6 @@
             <div v-else class="empty-state">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.35"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
               <p>Нет подписанных документов</p>
-            </div>
-          </section>
-
-          <!-- ======== НАЧАЛЬНИК: ОТПРАВИТЬ (вкладка) ======== -->
-          <section v-else-if="activeTab === 'send' && isBoss" key="send">
-            <div class="page-header">
-              <div><h1>Отправить документ</h1></div>
-            </div>
-            <div class="card card--wide">
-              <div class="form-col">
-                <label class="field-label">Заголовок
-                  <input v-model="documentForm.title" class="input" placeholder="Приказ №12" />
-                </label>
-                <label class="field-label">Содержимое
-                  <textarea v-model="documentForm.content" class="input textarea" rows="4" placeholder="Текст..."></textarea>
-                </label>
-                <label class="field-label">Ссылка <span class="field-optional">(необязательно)</span>
-                  <input v-model="documentForm.link" class="input" type="url" placeholder="https://example.com/doc.pdf" />
-                </label>
-                <div class="form-row">
-                  <label class="field-label" style="flex:1">Организация
-                    <select v-model="documentForm.organization_id" class="input" @change="onDocOrgChange">
-                      <option :value="null" disabled>— выберите —</option>
-                      <option v-for="o in organizations" :key="o.id" :value="o.id">{{ o.name }}</option>
-                    </select>
-                    <span v-if="!organizations.length" class="hint-warn">⚠ Нет организаций. Обратитесь к администратору.</span>
-                  </label>
-                  <label class="field-label" style="flex:1">Отдел
-                    <select v-model="documentForm.department_id" class="input">
-                      <option :value="null" disabled>— выберите —</option>
-                      <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-                    </select>
-                  </label>
-                </div>
-                <label class="field-label">Получатель
-                  <select v-model="sendForm.recipient_user_id" class="input">
-                    <option :value="null" disabled>— выберите —</option>
-                    <option v-for="u in orgUsers" :key="u.id" :value="u.user_id ?? u.id">{{ u.full_name }} ({{ u.email }})</option>
-                  </select>
-                  <span v-if="usersLoading" class="hint">⏳ Загружаем сотрудников...</span>
-                  <span v-else-if="sendForm.organization_id && !orgUsers.length" class="hint-warn">⚠ Нет сотрудников в этой организации</span>
-                </label>
-                <button
-                  class="btn btn--primary"
-                  @click="createAndSend"
-                  :disabled="sendLoading || !documentForm.organization_id || !documentForm.department_id"
-                >
-                  <svg v-if="sendLoading" class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-                  {{ sendLoading ? 'Отправляем...' : 'Создать и отправить' }}
-                </button>
-                <p v-if="lastIds.document_id" class="hint success">✓ Последний документ ID: <code>{{ lastIds.document_id }}</code></p>
-              </div>
             </div>
           </section>
 
@@ -612,7 +554,6 @@ const roleForm = reactive({
   user_id: null, organization_id: null, department_id: null,
   role_name: '', can_send_document: false, can_sign_document: false, can_manage_department: false
 })
-// documentForm теперь содержит и поля для отправки
 const documentForm = reactive({ title: '', content: '', link: '', organization_id: null, department_id: null })
 const sendForm     = reactive({ document_id: null, organization_id: null, department_id: null, recipient_user_id: null })
 const signForm     = reactive({ document_id: null })
@@ -641,7 +582,7 @@ const visibleTabs = computed(() => {
     { key: 'read_unsigned', label: 'Не подписанные' },
     { key: 'signed',        label: 'Подписанные' },
   ]
-  if (isBoss.value)     return [...common, { key: 'send',       label: 'Отправить документ' }]
+  // Босс не получает отдельную вкладку — форма уже на главной
   if (isEmployee.value) return [...common, { key: 'sign',       label: 'Подписать' }]
   if (isAdmin.value)    return [...common, { key: 'admin_info', label: 'Мониторинг' }]
   return common
@@ -865,7 +806,6 @@ async function assignRole() {
 
 // ---- DOCUMENTS ----
 
-// Единая функция: создать → сразу отправить
 async function createAndSend() {
   if (!documentForm.title.trim()) return showToast('Укажите заголовок', 'error')
   if (!documentForm.content?.trim() && !documentForm.link?.trim()) return showToast('Укажите текст или ссылку', 'error')
@@ -877,7 +817,6 @@ async function createAndSend() {
 
   sendLoading.value = true
   try {
-    // Шаг 1 — создать документ
     const doc = await apiRequest('/documents/create', 'POST', {
       title: documentForm.title,
       content: documentForm.content || '',
@@ -889,7 +828,6 @@ async function createAndSend() {
     lastIds.document_id = docId
     sentDocuments.value.push({ id: docId, title: documentForm.title })
 
-    // Шаг 2 — отправить получателю
     await apiRequest('/documents/send', 'POST', {
       document_id: docId,
       organization_id: orgId,
@@ -898,7 +836,6 @@ async function createAndSend() {
     })
 
     showToast('Документ создан и отправлен!')
-    // Сброс формы
     documentForm.title = ''
     documentForm.content = ''
     documentForm.link = ''
