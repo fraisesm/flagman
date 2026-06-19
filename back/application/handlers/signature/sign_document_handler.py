@@ -36,12 +36,5 @@ class SignDocumentHandler:
             digestmod=hashlib.sha256,
         ).hexdigest()
 
-        # After signing — update the recipient status to "signed"
-        recipient = (
-            self.document_repository.get_document_status_for_user(document_id, user_id)
-        )
-        if recipient:
-            recipient.status = "signed"
-            self.signature_repository.db.commit()
-
+        # signature_repository.create() also sets recipient status -> "signed"
         return self.signature_repository.create(user_id, document_id, phone_signature)
