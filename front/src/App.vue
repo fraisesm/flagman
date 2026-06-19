@@ -56,7 +56,7 @@
             <label>Роль
               <select v-model="registerForm.role" class="input">
                 <option value="employee">Сотрудник</option>
-                <option value="manager">Начальник</option>
+                <option value="boss">Начальник</option>
                 <option value="admin">Администратор</option>
               </select>
             </label>
@@ -250,8 +250,8 @@
               </div>
             </template>
 
-            <!-- MANAGER: единая форма создать и отправить -->
-            <div v-if="userRole === 'manager'" class="section-block">
+            <!-- BOSS: единая форма создать и отправить -->
+            <div v-if="userRole === 'boss'" class="section-block">
               <h2 class="section-title">Создать и отправить документ</h2>
               <div class="card card--form-center">
                 <div class="card__title">📄 Новый документ</div>
@@ -539,9 +539,9 @@ const signForm     = reactive({ document_id: null })
 const statusForm   = reactive({ document_id: null, recipient_user_id: null })
 
 // ---- COMPUTED ----
-const roleIcon = computed(() => ({ admin: '🛡️', manager: '👔', employee: '👤' }[userRole.value] || '👤'))
+const roleIcon = computed(() => ({ admin: '🛡️', boss: '👔', employee: '👤' }[userRole.value] || '👤'))
 
-const roleLabel = computed(() => ({ admin: 'Администратор', manager: 'Начальник', employee: 'Сотрудник' }[userRole.value] || userRole.value || ''))
+const roleLabel = computed(() => ({ admin: 'Администратор', boss: 'Начальник', employee: 'Сотрудник' }[userRole.value] || userRole.value || ''))
 
 const firstName = computed(() => {
   const name = currentUser.value?.full_name ?? ''
@@ -550,7 +550,7 @@ const firstName = computed(() => {
 
 const roleDescription = computed(() => ({
   admin:    'Администратор — полный контроль над системой',
-  manager:  'Начальник — создание и отправка документов на подпись',
+  boss:     'Начальник — создание и отправка документов на подпись',
   employee: 'Сотрудник — просмотр и подписание входящих документов'
 })[userRole.value] || '')
 
@@ -563,7 +563,7 @@ const visibleTabs = computed(() => {
     { key: 'read_unsigned', label: 'Не подписанные' },
     { key: 'signed',        label: 'Подписанные' },
   ]
-  if (userRole.value === 'manager')  return [{ key: 'home', label: 'Главная' }, { key: 'inbox', label: 'Полученные письма', badge: true }, { key: 'read_unsigned', label: 'Не подписанные' }, { key: 'signed', label: 'Подписанные' }]
+  if (userRole.value === 'boss')     return common
   if (userRole.value === 'employee') return [...common, { key: 'sign', label: 'Подписать' }]
   if (userRole.value === 'admin')    return [...common, { key: 'admin_info', label: 'Мониторинг' }]
   return common
