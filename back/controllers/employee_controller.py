@@ -33,7 +33,11 @@ def invite_employee(
 
 
 @router.get("/by-organization/{organization_id}", response_model=List[EmployeeResponse])
-def list_employees(organization_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def list_employees(
+    organization_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     repo = EmployeeRepository(db)
     return repo.get_all_by_organization(organization_id)
 
@@ -45,17 +49,15 @@ def list_employees_by_department(
     current_user=Depends(get_current_user),
 ):
     repo = EmployeeRepository(db)
-    from data.models.employee_membership_model import EmployeeMembershipModel
-    results = (
-        db.query(EmployeeMembershipModel)
-        .filter(EmployeeMembershipModel.department_id == department_id)
-        .all()
-    )
-    return [repo._enrich(m) for m in results]
+    return repo.get_by_department_only(department_id)
 
 
 @router.get("/{membership_id}", response_model=EmployeeResponse)
-def get_employee(membership_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def get_employee(
+    membership_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     repo = EmployeeRepository(db)
     result = repo.get_by_id(membership_id)
     if not result:
@@ -78,7 +80,11 @@ def update_employee(
 
 
 @router.delete("/{membership_id}")
-def remove_employee(membership_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def remove_employee(
+    membership_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     repo = EmployeeRepository(db)
     result = repo.delete(membership_id)
     if not result:

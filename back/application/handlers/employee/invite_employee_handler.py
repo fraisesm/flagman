@@ -8,11 +8,11 @@ class InviteEmployeeHandler:
         self.employee_repository = employee_repository
 
     def handle(self, command: InviteEmployeeCommand):
-        existing_membership = self.employee_repository.get_by_user_and_organization(
+        existing = self.employee_repository.get_by_user_and_organization(
             command.user_id,
             command.organization_id,
         )
-        if existing_membership:
+        if existing:
             raise ValueError("Сотрудник уже добавлен в организацию")
 
         membership = EmployeeMembership(
@@ -21,5 +21,4 @@ class InviteEmployeeHandler:
             department_id=command.department_id,
             role=command.role,
         )
-
         return self.employee_repository.create_membership(membership)

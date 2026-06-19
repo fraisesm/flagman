@@ -36,7 +36,8 @@ class EmployeeRepository:
         return self._enrich(model)
 
     def get_by_user_and_organization(self, user_id: int, organization_id: int):
-        result = (
+        """Returns raw ORM model (needed by send_document_handler role check)."""
+        return (
             self.db.query(EmployeeMembershipModel)
             .filter(
                 EmployeeMembershipModel.user_id == user_id,
@@ -44,7 +45,6 @@ class EmployeeRepository:
             )
             .first()
         )
-        return self._enrich(result)
 
     def get_by_id(self, membership_id: int):
         result = self.db.query(EmployeeMembershipModel).filter(EmployeeMembershipModel.id == membership_id).first()
@@ -65,6 +65,15 @@ class EmployeeRepository:
                 EmployeeMembershipModel.organization_id == organization_id,
                 EmployeeMembershipModel.department_id == department_id,
             )
+            .all()
+        )
+        return [self._enrich(m) for m in results]
+
+    def get_by_department_only(self, department_id: int):
+        """Used by /employees/list/{department_id} — filter by department only."""
+        results = (
+            self.db.query(EmployeeMembershipModel)
+            .filter(EmployeeMembershipModel.department_id == department_id)
             .all()
         )
         return [self._enrich(m) for m in results]

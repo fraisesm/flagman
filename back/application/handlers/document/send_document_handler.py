@@ -18,7 +18,7 @@ class SendDocumentHandler:
         self.employee_repository = employee_repository
 
     def _sender_can_send(self, command: SendDocumentCommand) -> bool:
-        # 1. Проверяем DepartmentRoleModel (явно выданные права)
+        # 1. Check explicit DepartmentRole permission
         sender_role = self.access_repository.get_user_role_in_department(
             command.sender_user_id,
             command.organization_id,
@@ -27,7 +27,7 @@ class SendDocumentHandler:
         if sender_role and sender_role.can_send_document is True:
             return True
 
-        # 2. Fallback: проверяем роль в EmployeeMembership (boss / admin)
+        # 2. Fallback: check EmployeeMembership role (raw ORM model, has .role)
         if self.employee_repository:
             membership = self.employee_repository.get_by_user_and_organization(
                 command.sender_user_id,
@@ -42,11 +42,11 @@ class SendDocumentHandler:
         if not self._sender_can_send(command):
             raise ValueError("У отправителя нет права отправлять документы")
 
-        existing_recipient = self.document_repository.get_existing_recipient(
+        existing = self.document_repository.get_existing_recipient(
             command.document_id,
             command.recipient_user_id,
         )
-        if existing_recipient:
+        if existing:
             raise ValueError("Этот документ уже отправлен данному сотруднику")
 
         return self.document_repository.send_to_recipient(
