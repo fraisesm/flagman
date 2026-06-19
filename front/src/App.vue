@@ -283,7 +283,7 @@
                     <label class="field-label" style="flex:1">Получатель
                       <select v-model.number="sendForm.recipient_user_id" class="input">
                         <option :value="null" disabled>— выберите —</option>
-                        <option v-for="emp in employees" :key="emp.id" :value="emp.id">{{ emp.full_name ?? emp.email }}</option>
+                        <option v-for="emp in employees" :key="emp.user_id" :value="emp.user_id">{{ emp.full_name ?? emp.email }}</option>
                       </select>
                     </label>
                   </div>
@@ -682,8 +682,10 @@ async function loadEmployeesByDept(deptId) {
 }
 
 import { watch } from 'vue'
-watch(() => documentForm.organization_id, (orgId) => { loadDepartmentsByOrg(orgId) })
-watch(() => documentForm.department_id,   (deptId) => { loadEmployeesByDept(deptId) })
+// immediate:true — если documentForm уже заполнен (например после createOrganization),
+// watch сработает сразу при маунте, а не только при изменении значения
+watch(() => documentForm.organization_id, (orgId) => { loadDepartmentsByOrg(orgId) }, { immediate: true })
+watch(() => documentForm.department_id,   (deptId) => { loadEmployeesByDept(deptId) }, { immediate: true })
 
 async function createAndSend() {
   try {
